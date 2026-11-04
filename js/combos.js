@@ -364,6 +364,34 @@ function pintarCombosAdmin() {
   </article>`).join('') || '<p>Aún no hay combos.</p>';
 }
 
+function imprimirCombos() {
+  if (!esAdmin) return;
+  if (!combosDisponibles.length) return alert('No hay combos disponibles para imprimir.');
+  const fecha = new Date().toLocaleString('es');
+  const filas = combosDisponibles.map(combo => {
+    const componentes = combo.componentes.map(p => {
+      const producto = indice.get(p.codigo);
+      const stock = producto && producto.cantidad != null ? Number(producto.cantidad) : p.stock;
+      return `<tr><td>${esc(p.nombre)}</td><td>${esc(p.codigo)}</td><td class="num">${p.cantidad}</td><td class="num">${stock}</td></tr>`;
+    }).join('');
+    return `<section class="combo"><h2>${esc(combo.nombre)} <span>${fmt(combo.precio)}</span></h2>
+      <table><thead><tr><th>Producto</th><th>Código</th><th class="num">Cant. combo</th><th class="num">Existencia</th></tr></thead>
+      <tbody>${componentes}</tbody></table></section>`;
+  }).join('');
+  const w = window.open('', '_blank');
+  if (!w) return alert('Permite las ventanas emergentes para imprimir los combos.');
+  const css = `@page{size:A4;margin:12mm}body{font:10pt Arial,sans-serif;color:#000;margin:0}
+h1{font-size:18pt;margin:0 0 2mm}.meta{font-size:9pt;color:#444;margin-bottom:8mm}
+.combo{break-inside:avoid;margin:0 0 8mm}.combo h2{display:flex;justify-content:space-between;gap:8mm;font-size:13pt;margin:0;padding:0 0 2mm;border-bottom:1px solid #444}
+table{width:100%;border-collapse:collapse;margin-top:2mm}th,td{padding:1.5mm 2mm;border-bottom:1px solid #ccc;text-align:left}
+th{background:#eee}.num{text-align:right}`;
+  w.document.write(`<!DOCTYPE html><html lang="es"><head><meta charset="utf-8"><title>Combos disponibles</title><style>${css}</style></head>
+    <body><h1>Combos · Distribuidora Camila</h1><div class="meta">Impreso: ${esc(fecha)} · ${combosDisponibles.length} combo(s)</div>${filas}</body></html>`);
+  w.document.close();
+  w.focus();
+  setTimeout(() => w.print(), 400);
+}
+
 $('productosCombo').addEventListener('click', e => {
   const boton = e.target.closest('[data-agregar-producto-combo]');
   if (!boton || boton.disabled) return;
