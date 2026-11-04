@@ -24,12 +24,18 @@ td input{width:60px}.lista{max-height:420px;overflow:auto}
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;padding:16px;z-index:50}
 .caja{background:#fff;border-radius:10px;padding:18px;max-width:420px;width:100%;max-height:92vh;overflow:auto}
 .caja.alerta{border:4px solid #e0b100}
+.combo{position:relative;display:flex;flex:1;min-width:220px}
+.combo input{flex:1;min-width:0;border-radius:6px 0 0 6px}
+.flecha{border-radius:0 6px 6px 0;background:#fff;color:#141a17;border:1px solid #c9cec3;border-left:0;padding:10px 12px}
+#listaCorreos{position:absolute;top:100%;left:0;right:0;margin-top:2px;background:#fff;border:1px solid #c9cec3;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.18);z-index:10;max-height:240px;overflow:auto}
+.opc{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;cursor:pointer}
+.opc:hover{background:#eef0ea}.opc button{background:none;color:#9b2226;border:0;padding:0 6px;font-size:16px}
 .oculto{display:none!important}
 </style></head><body>
 
 <div id="login" class="card oculto">
   <h2>Inventario Camila</h2>
-  <div class="row"><input id="email" type="email" list="correos" placeholder="Correo" autocomplete="off"><datalist id="correos"></datalist><input id="pass" type="password" placeholder="Contraseña" autocomplete="off">
+  <div class="row"><div class="combo"><input id="email" type="email" placeholder="Correo" autocomplete="off"><button type="button" class="flecha" onclick="alternarCorreos()" title="Correos usados antes">▾</button><div id="listaCorreos" class="oculto"></div></div><input id="pass" type="password" placeholder="Contraseña" autocomplete="off">
   <button onclick="entrar()">Entrar</button></div><p id="errLogin" class="s"></p><p id="okLogin" class="e"></p>
   <p style="margin:0"><a href="#" onclick="olvide();return false">¿Olvidaste tu contraseña?</a></p>
 </div>
@@ -46,12 +52,16 @@ td input{width:60px}.lista{max-height:420px;overflow:auto}
 <div id="app" class="oculto">
   <div class="row" style="justify-content:space-between">
     <div class="row">
-      <button onclick="vista('inicio')">Escáner</button>
-      <button onclick="vista('etq')">Etiquetas</button>
-      <button id="btnAdmin" onclick="vista('adm')">Inventario</button>
-      <button id="btnCodigos" class="oculto" onclick="vista('cod')">Códigos</button>
+      <button onclick="alternarMenu()">☰ Menú</button>
+      <button id="btnVolver" class="oculto" onclick="vista('inicio')">← Escáner</button>
     </div>
     <span><span id="quien"></span> <button onclick="salir()">Salir</button></span>
+  </div>
+  <div id="menu" class="card row oculto">
+    <button onclick="vista('inicio')">Escáner</button>
+    <button onclick="vista('etq')">Etiquetas</button>
+    <button id="btnAdmin" onclick="vista('adm')">Inventario</button>
+    <button id="btnCodigos" class="oculto" onclick="vista('cod')">Crear código nuevo</button>
   </div>
 
   <!-- ========== ESCÁNER ========== -->
@@ -92,7 +102,8 @@ td input{width:60px}.lista{max-height:420px;overflow:auto}
 
   <!-- ========== ADMIN ========== -->
   <div id="adm" class="oculto">
-    <div class="card row"><input id="admBuscar" placeholder="Buscar producto" oninput="pintarAdm()" style="flex:1"><button id="btnNuevoCod" class="v oculto" onclick="vista('cod')">+ Código nuevo</button></div>
+    <div class="card row"><input id="admBuscar" placeholder="Buscar producto" oninput="pintarAdm()" style="flex:1"><button onclick="imprimirInventario()">🖨 Imprimir inventario</button><button id="btnNuevoCod" class="v oculto" onclick="vista('cod')">+ Código nuevo</button>
+      <small id="admCount" style="width:100%"></small></div>
     <div class="card lista"><table><thead id="admHead"></thead><tbody id="admCuerpo"></tbody></table></div>
     <div id="admMov" class="card oculto"><b>Movimientos</b>
       <div class="row"><input type="date" id="desde"><input type="date" id="hasta">
@@ -165,7 +176,7 @@ const sinNombre = n => { const t = (n || '').trim(); return !t || /^sin nombre$/
 const nombreValido = n => n.length >= 2 && /[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/.test(n) && !sinNombre(n);
 
 let delta = 0, pedido = [], catalogo = [], indice = new Map(), cant = {}, cola = Promise.resolve();
-let esAdmin = false, prods = [], uidActual = null, usuarioEmail = '';
+let esAdmin = false, rolCargado = false, prods = [], uidActual = null, usuarioEmail = '';
 let bloqueo = null, descartados = 0, compActual = null, avisoT = null;
 
 // ---------- SESIÓN ----------
@@ -182,6 +193,7 @@ function reiniciarUI() {
   $('cliente').value = ''; $('exist').textContent = '—'; $('aviso').classList.add('oculto');
   $('modalNombre').classList.add('oculto'); $('modalComp').classList.add('oculto');
   $('btnCodigos').classList.add('oculto'); $('btnNuevoCod').classList.add('oculto'); $('admMov').classList.add('oculto');
+  $('menu').classList.add('oculto'); $('btnVolver').classList.add('oculto'); rolCargado = false;
   pintarPedido();
 }
 function mostrar(session) {
@@ -208,9 +220,27 @@ function guardarCorreo(c) {
 }
 function cargarCorreos() {
   const lista = leerCorreos();
-  $('correos').innerHTML = lista.map(c => `<option value="${esc(c)}">`).join('');
   if (lista.length && !$('email').value) $('email').value = lista[0];
 }
+// Lista desplegable propia (la del navegador solo mostraba el correo que ya estaba escrito)
+function pintarCorreos() {
+  const lista = leerCorreos();
+  $('listaCorreos').innerHTML = lista.length
+    ? lista.map(c => `<div class="opc" data-c="${esc(c)}"><span>${esc(c)}</span><button type="button" data-del="${esc(c)}" title="Quitar de la lista">✕</button></div>`).join('')
+    : '<div class="opc" style="color:#777;cursor:default">Aún no hay correos guardados</div>';
+}
+function alternarCorreos() { pintarCorreos(); $('listaCorreos').classList.toggle('oculto'); }
+$('listaCorreos').addEventListener('click', e => {
+  const del = e.target.dataset && e.target.dataset.del;
+  if (del !== undefined) {                       // quitar un correo de la lista
+    e.stopPropagation();
+    try { localStorage.setItem('correos', JSON.stringify(leerCorreos().filter(x => x !== del))); } catch (err) {}
+    pintarCorreos(); return;
+  }
+  const o = e.target.closest('.opc');
+  if (o && o.dataset.c) { $('email').value = o.dataset.c; $('listaCorreos').classList.add('oculto'); $('pass').focus(); }
+});
+document.addEventListener('click', e => { if (!e.target.closest('.combo')) $('listaCorreos').classList.add('oculto'); });
 async function entrar() {
   const correo = $('email').value.trim();
   const { error } = await db.auth.signInWithPassword({ email: correo, password: $('pass').value });
@@ -247,17 +277,29 @@ async function guardarClave() {
 }
 $('clave2').addEventListener('keydown', e => { if (e.key === 'Enter') guardarClave(); });
 
+function alternarMenu() { $('menu').classList.toggle('oculto'); }
 function vista(v) {
   if (v === 'cod' && !esAdmin) v = 'inicio';   // crear códigos: solo admin
   ['inicio', 'etq', 'adm', 'cod'].forEach(x => $(x).classList.toggle('oculto', x !== v));
+  $('menu').classList.add('oculto');
+  $('btnVolver').classList.toggle('oculto', v === 'inicio');
+  if (!rolCargado && uidActual) cargarRol(uidActual);   // reintenta si el rol no se pudo leer
   if (v === 'inicio' || v === 'etq') cargarCatalogo();
   if (v === 'adm') { cargarAdmin(); if (esAdmin) reporte(); }
   if (v === 'cod') abrirCodigos();
   if (v === 'inicio' && !$('codigo').disabled) $('codigo').focus();
 }
-async function cargarRol(uid) {
-  const { data } = await db.from('perfiles').select('rol').eq('id', uid).single();
-  esAdmin = !!data && data.rol === 'admin';
+async function cargarRol(uid, intento = 0) {
+  const { data, error } = await db.from('perfiles').select('rol').eq('id', uid).maybeSingle();
+  if (uid !== uidActual) return;
+  if (error) {
+    console.error('No se pudo leer el rol:', error);
+    if (intento < 2) return setTimeout(() => cargarRol(uid, intento + 1), 1200);
+  }
+  rolCargado = !error;
+  esAdmin = !!data && String(data.rol || '').trim().toLowerCase() === 'admin';
+  // junto al correo se ve el rol detectado, para comprobar que quedó bien
+  $('quien').textContent = usuarioEmail + ' · ' + (error ? 'no se pudo leer el rol' : !data ? 'sin perfil' : esAdmin ? 'admin' : String(data.rol));
   // Inventario lo ve todo el mundo (solo lectura); crear códigos y editar es solo admin
   $('btnCodigos').classList.toggle('oculto', !esAdmin);
   $('btnNuevoCod').classList.toggle('oculto', !esAdmin);
@@ -559,9 +601,32 @@ async function cargarAdmin() {
   prods.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es'));
   pintarAdm();
 }
-function pintarAdm() {
+function admFiltrados() {
   const q = $('admBuscar').value.toLowerCase().trim();
-  const lista = prods.filter(p => !q || (p.nombre || '').toLowerCase().includes(q) || p.codigo.includes(q)).slice(0, 300);
+  return prods.filter(p => !q || (p.nombre || '').toLowerCase().includes(q) || p.codigo.includes(q));
+}
+function imprimirInventario() {
+  const lista = admFiltrados();
+  if (!lista.length) return alert('No hay productos para imprimir (¿ya cargó el inventario?).');
+  const q = $('admBuscar').value.trim();
+  const unid = lista.reduce((a, p) => a + (Number(p.cantidad) || 0), 0);
+  const filas = lista.map(p => `<tr><td>${esc(p.codigo)}</td><td>${esc(p.nombre)}</td><td class="d">${p.cantidad}</td><td class="d">${p.precio_normal == null ? '-' : fmt(p.precio_normal)}</td></tr>`).join('');
+  const css = `@page{size:A4;margin:12mm}body{font:11pt Arial,sans-serif;color:#000;margin:0}
+h1{font-size:16pt;margin:0}.meta{font-size:9pt;color:#333;margin:2mm 0 4mm}
+table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #bbb;padding:1.6mm 1.5mm;text-align:left;font-size:9.5pt}
+th{border-bottom:2px solid #000}thead{display:table-header-group}tr{break-inside:avoid}.d{text-align:right}
+tfoot td{border-top:2px solid #000;border-bottom:0;font-weight:bold}`;
+  const w = window.open('', '_blank'); if (!w) return alert('Permite las ventanas emergentes.');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Inventario</title><style>${css}</style></head><body>
+<h1>Inventario · Distribuidora Camila</h1>
+<div class="meta">Fecha: ${fechaTxt(new Date())} · Usuario: ${esc(usuarioEmail)}${q ? ' · Filtro: «' + esc(q) + '»' : ''}</div>
+<table><thead><tr><th>Código</th><th>Nombre</th><th class="d">Stock</th><th class="d">Precio normal</th></tr></thead><tbody>${filas}</tbody>
+<tfoot><tr><td colspan="2">${lista.length} producto(s)</td><td class="d">${unid}</td><td></td></tr></tfoot></table></body></html>`);
+  w.document.close(); w.focus(); setTimeout(() => w.print(), 400);
+}
+function pintarAdm() {
+  const todos = admFiltrados(), lista = todos.slice(0, 300);
+  $('admCount').textContent = `Mostrando ${lista.length} de ${todos.length} producto(s)` + (todos.length > 300 ? ' · usa el buscador para acotar; al imprimir salen todos' : '');
   const et = p => `<td><button data-et="${esc(p.codigo)}" title="Imprimir etiqueta">🏷</button></td>`;
   if (!esAdmin) {   // solo lectura
     $('admHead').innerHTML = '<tr><th>Código</th><th>Nombre</th><th>Stock</th><th>Precio</th><th>Etiq.</th></tr>';
