@@ -34,6 +34,7 @@ tfoot td{border-top:2px solid #000;border-bottom:0;font-weight:bold}`;
 }
 function pintarAdm() {
   const todos = admFiltrados(), lista = todos.slice(0, 300);
+  $('admTabla').classList.toggle('admin', esAdmin);
   $('admCount').textContent = `Mostrando ${lista.length} de ${todos.length} producto(s)` + (todos.length > 300 ? ' · usa el buscador para acotar; al imprimir salen todos' : '');
   const et = p => `<td><button data-et="${esc(p.codigo)}" title="Imprimir etiqueta">🏷</button></td>`;
   if (!esAdmin) {   // solo lectura
@@ -43,19 +44,50 @@ function pintarAdm() {
        <td>${prVer(p.precio_normal)}</td><td>${prVer(p.precio_en_vivo)}</td><td>${prVer(p.precio_mayorista)}</td>${et(p)}</tr>`).join('');
     return;
   }
-  $('admHead').innerHTML = '<tr><th>Código</th><th>Nombre</th><th>Stock</th><th>Normal</th><th>TikTok</th><th>Mayorista</th><th>Etiq.</th></tr>';
+  $('admHead').innerHTML = '<tr><th>Código</th><th>Nombre</th><th>Stock</th><th>Normal</th><th>TikTok</th><th>Mayorista</th><th>Etiq.</th><th>Quitar</th></tr>';
   const num = (id, c, v) => `<td><input class="adm-precio" type="number" step="0.01" value="${v ?? ''}" onchange="guardarCampo(${id},'${c}',this.value)"></td>`;
   $('admCuerpo').innerHTML = lista.map(p =>
     `<tr><td>${esc(p.codigo)}</td><td><input class="adm-nombre" value="${esc(p.nombre)}" title="${esc(p.nombre)}" onchange="guardarCampo(${p.id},'nombre',this.value)"></td>
      <td><input type="number" value="${p.cantidad}" onchange="ajustarStock(${p.id},this.value)" style="${p.cantidad < 0 ? 'color:#9b2226' : ''}"></td>
-     ${num(p.id, 'precio_normal', p.precio_normal)}${num(p.id, 'precio_en_vivo', p.precio_en_vivo)}${num(p.id, 'precio_mayorista', p.precio_mayorista)}${et(p)}</tr>`).join('');
+     ${num(p.id, 'precio_normal', p.precio_normal)}${num(p.id, 'precio_en_vivo', p.precio_en_vivo)}${num(p.id, 'precio_mayorista', p.precio_mayorista)}${et(p)}
+     <td><button type="button" class="inventario-eliminar" data-eliminar-producto="${esc(p.id)}" aria-label="Eliminar ${esc(p.nombre)} (${esc(p.codigo)})" title="Eliminar producto">×</button></td></tr>`).join('');
 }
 // Desde el inventario: manda el producto a Etiquetas con cantidad 1
 $('admCuerpo').addEventListener('click', e => {
-  const c = e.target.dataset && e.target.dataset.et;
+  const boton = e.target.closest('button');
+  if (!boton) return;
+  const id = boton.dataset.eliminarProducto;
+  if (id !== undefined) return eliminarProducto(id, boton);
+  const c = boton.dataset.et;
   if (c === undefined) return;
   cant[c] = 1; vista('etq'); $('buscar').value = c; pintarCat();
 });
+async function eliminarProducto(id, boton) {
+  if (!esAdmin) return;
+  const p = prods.find(x => String(x.id) === String(id));
+  if (!p) return;
+  const enPedido = pedido.some(i => i.tipo === 'combo'
+    ? Array.isArray(i.componentes) && i.componentes.some(componente => componente.codigo === p.codigo)
+    : i.codigo === p.codigo);
+  if (enPedido) return alert(`No se puede eliminar "${p.nombre}" porque está en el pedido abierto. Cierra o quita esa línea primero.`);
+  if (!confirm(`¿Eliminar "${p.nombre}" (${p.codigo}) del inventario? Esta acción no se puede deshacer. Los comprobantes e historial existentes se conservarán.`)) return;
+  boton.disabled = true;
+  try {
+    const { error } = await db.rpc('eliminar_producto', { p_id: String(p.id) });
+    if (error) throw error;
+    prods = prods.filter(x => String(x.id) !== String(p.id));
+    catalogo = catalogo.filter(x => String(x.id) !== String(p.id));
+    indice.delete(p.codigo);
+    delete cant[p.codigo];
+    delete precioElegido[p.codigo];
+    pintarAdm();
+    pintarCat();
+    pintarPedido();
+  } catch (e) {
+    alert('No se pudo eliminar el producto: ' + e.message);
+    boton.disabled = false;
+  }
+}
 async function guardarCampo(id, campo, v) {
   if (!esAdmin) return;
   const p = prods.find(x => x.id === id);

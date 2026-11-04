@@ -126,7 +126,7 @@
   <div id="adm" class="oculto">
     <div class="card row"><input id="admBuscar" placeholder="Buscar producto" oninput="pintarAdm()" style="flex:1"><button onclick="imprimirInventario()">🖨 Imprimir inventario</button><button id="btnNuevoCod" class="v oculto" onclick="vista('cod')">+ Código nuevo</button>
       <small id="admCount" style="width:100%"></small></div>
-    <div class="card lista inventario-lista"><table><thead id="admHead"></thead><tbody id="admCuerpo"></tbody></table></div>
+    <div class="card lista inventario-lista"><table id="admTabla"><thead id="admHead"></thead><tbody id="admCuerpo"></tbody></table></div>
     <div id="admMov" class="card oculto"><b>Movimientos</b>
       <div class="row"><input type="date" id="desde"><input type="date" id="hasta">
         <select id="fTipo"><option value="">Todos</option><option>Entrada</option><option>Descargo</option></select>

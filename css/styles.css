@@ -33,7 +33,15 @@ td input{width:100%;min-width:0}
 #adm .inventario-lista th:nth-child(4),#adm .inventario-lista th:nth-child(5){width:12%}
 #adm .inventario-lista th:nth-child(6){width:15%}
 #adm .inventario-lista th:nth-child(7){width:10%}
+#adm .inventario-lista table.admin th:nth-child(1){width:11%}
+#adm .inventario-lista table.admin th:nth-child(2){width:27%}
+#adm .inventario-lista table.admin th:nth-child(3){width:7%}
+#adm .inventario-lista table.admin th:nth-child(4),#adm .inventario-lista table.admin th:nth-child(5){width:11%}
+#adm .inventario-lista table.admin th:nth-child(6){width:13%}
+#adm .inventario-lista table.admin th:nth-child(7){width:9%}
+#adm .inventario-lista table.admin th:nth-child(8){width:5%}
 #adm .inventario-lista th,#adm .inventario-lista td{padding:7px 8px;overflow-wrap:anywhere}
+#adm .inventario-eliminar{background:#9b2226;min-width:36px;padding:6px 10px;font-size:18px;line-height:1}
 .adm-nombre{display:block;width:100%!important;min-width:0!important;max-width:100%;padding:8px}
 .adm-precio{display:block;width:100%!important;min-width:0!important;padding:8px}
 #adm .inventario-lista td:nth-child(3) input{min-width:0}

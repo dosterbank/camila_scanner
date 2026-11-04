@@ -243,12 +243,51 @@ begin
 end;
 $$;
 
+create or replace function public.eliminar_producto(p_id text)
+returns void
+language plpgsql
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+declare
+  v_codigo text;
+  v_nombre text;
+begin
+  if auth.uid() is null or not public.usuario_es_admin() then
+    raise exception 'Solo administradores pueden eliminar productos.';
+  end if;
+  if p_id is null or length(p_id) > 100 then
+    raise exception 'El identificador del producto no es valido.';
+  end if;
+
+  select p.codigo, p.nombre into v_codigo, v_nombre
+  from public.productos p
+  where p.id::text = p_id
+  for update;
+  if not found then
+    raise exception 'El producto ya no existe.';
+  end if;
+  if exists (
+    select 1
+    from public.combo_productos cp
+    join public.combos_caja c on c.id = cp.combo_id
+    where cp.codigo = v_codigo and c.activo
+  ) then
+    raise exception 'No se puede eliminar "%": forma parte de un combo activo. Edita o elimina primero ese combo.', v_nombre;
+  end if;
+
+  delete from public.productos where id::text = p_id;
+end;
+$$;
+
 revoke all on function public.listar_combos() from public, anon;
 revoke all on function public.guardar_combo(uuid, text, numeric, jsonb) from public, anon;
 revoke all on function public.eliminar_combo(uuid) from public, anon;
+revoke all on function public.eliminar_producto(text) from public, anon;
 grant execute on function public.listar_combos() to authenticated;
 grant execute on function public.guardar_combo(uuid, text, numeric, jsonb) to authenticated;
 grant execute on function public.eliminar_combo(uuid) to authenticated;
+grant execute on function public.eliminar_producto(text) to authenticated;
 
 create policy "Admins can read orders" on public.pedidos
   for select to authenticated using (public.usuario_es_admin());
