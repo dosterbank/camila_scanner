@@ -8,6 +8,35 @@ const CSS_RECIBO = `.recibo{max-width:320px;margin:0 auto;padding:12px;border:1p
 .recibo .tot{display:flex;justify-content:space-between;font-weight:bold;font-size:1.25em}`;
 document.head.appendChild(Object.assign(document.createElement('style'), { textContent: CSS_RECIBO }));
 
+const ANCHOS_PAPEL_RECIBO = [58, 78];
+const CLAVE_ANCHO_PAPEL_RECIBO = 'anchoPapelRecibo';
+function anchoPapelRecibo() {
+  const ancho = Number($('anchoPapelRecibo').value);
+  return ANCHOS_PAPEL_RECIBO.includes(ancho) ? ancho : 78;
+}
+function cargarAnchoPapelRecibo() {
+  try {
+    const ancho = Number(localStorage.getItem(CLAVE_ANCHO_PAPEL_RECIBO));
+    if (ANCHOS_PAPEL_RECIBO.includes(ancho)) $('anchoPapelRecibo').value = String(ancho);
+  } catch (e) {
+    $('estadoPedido').className = 's';
+    $('estadoPedido').textContent = 'No se pudo leer el tamaño de papel guardado; se usará 78 mm.';
+    console.error('Error al leer el tamaño de papel:', e);
+  }
+}
+function guardarAnchoPapelRecibo() {
+  try {
+    localStorage.setItem(CLAVE_ANCHO_PAPEL_RECIBO, String(anchoPapelRecibo()));
+    $('estadoPedido').className = '';
+    $('estadoPedido').textContent = '';
+  } catch (e) {
+    $('estadoPedido').className = 's';
+    $('estadoPedido').textContent = 'No se pudo guardar el tamaño de papel en este navegador.';
+    console.error('Error al guardar el tamaño de papel:', e);
+  }
+}
+cargarAnchoPapelRecibo();
+
 let clientesEncontrados = [];
 const p2 = n => String(n).padStart(2, '0');
 const fechaTxt = d => `${p2(d.getDate())}/${p2(d.getMonth() + 1)}/${d.getFullYear()} ${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}`;
@@ -178,16 +207,24 @@ async function imprimirComprobante() {
   const w = window.open('', '_blank'); if (!w) return alert('Permite las ventanas emergentes.');
   try {
     await guardarPedido();
-    const css = CSS_RECIBO + `@page{size:80mm auto;margin:0}html,body{width:80mm;margin:0}.recibo{box-sizing:border-box;max-width:none;width:80mm;margin:0;padding:3mm;border:.2mm dashed #888;font-size:9pt}`;
+    const ancho = anchoPapelRecibo();
+    const css = CSS_RECIBO + `@page{size:${ancho}mm auto;margin:0}html,body{width:${ancho}mm;margin:0;padding:0}.recibo{box-sizing:border-box;max-width:none;width:${ancho}mm;margin:0;padding:3mm;border:.2mm dashed #888;font-size:9pt}`;
     w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(compActual.numero)}</title><style>${css}</style></head><body><div class="recibo">${htmlRecibo(compActual)}</div></body></html>`);
     w.document.close(); w.focus(); setTimeout(() => w.print(), 400);
-  } catch {
+  } catch (e) {
     w.close();
+    $('estadoPedido').className = 's';
+    $('estadoPedido').textContent = 'No se pudo preparar la impresión: ' + e.message;
+    console.error('Error al preparar la impresión del comprobante:', e);
   }
 }
-// Dibuja el comprobante en un PDF de 80 mm de ancho (tipo ticket); devuelve la altura usada
-function dibujarPDF(doc, c) {
-  const W = 80, M = 6, X_DESC = 15, X_PU = 54, X_SUB = 74, ANCHO_DESC = 32;
+// Dibuja el comprobante al ancho de papel seleccionado; devuelve la altura usada.
+function dibujarPDF(doc, c, W) {
+  const M = W === 58 ? 3 : 6;
+  const X_DESC = W === 58 ? 12 : 15;
+  const X_PU = W === 58 ? 38 : 54;
+  const X_SUB = W - M;
+  const ANCHO_DESC = W === 58 ? 22 : 32;
   let y = 8;
   const centro = (t, s) => { doc.setFontSize(s); doc.text(t, W / 2, y, { align: 'center' }); };
   const par = t => doc.splitTextToSize(t, W - 2 * M).forEach(l => { doc.text(l, M, y); y += 3.6; });
@@ -226,10 +263,11 @@ async function guardarComprobante() {
   catch { return; }
   try {
     const { jsPDF } = window.jspdf;
-    const nuevo = h => new jsPDF({ unit: 'mm', format: [80, h], orientation: 'portrait' });
-    const alto = dibujarPDF(nuevo(3000), compActual);
+    const ancho = anchoPapelRecibo();
+    const nuevo = h => new jsPDF({ unit: 'mm', format: [ancho, h], orientation: 'portrait' });
+    const alto = dibujarPDF(nuevo(3000), compActual, ancho);
     const doc = nuevo(Math.max(alto + 6, 60));
-    dibujarPDF(doc, compActual);
+    dibujarPDF(doc, compActual, ancho);
     const nombre = compActual.cliente || 'Consumidor final';
     const archivo = nombre.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[<>:"/\\|?*\x00-\x1F]/g, '-').trim().replace(/\s+/g, '-');
     doc.save('comprobante-' + (archivo || 'Consumidor-final') + '-' + fechaNum(compActual.fecha) + '.pdf');

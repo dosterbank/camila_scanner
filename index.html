@@ -77,6 +77,10 @@
     <div class="row"><input id="buscar" placeholder="Buscar nombre o código" style="flex:1" oninput="pintarCat()">
       <button onclick="llenar(1)">1 a todos</button><button onclick="llenar(0)">Limpiar</button>
       <select id="formato"><option>CODE128</option><option>EAN13</option><option>EAN8</option><option>UPC</option><option>CODE39</option></select>
+      <label>Papel <select id="papelEtiqueta" onchange="cambiarPapelEtiqueta()">
+        <option value="52x23">Etiqueta 52 × 23 mm</option>
+        <option value="32x25" selected>Etiqueta 32 × 25 mm</option>
+      </select></label>
       <button class="v" onclick="imprimir()">Imprimir</button></div>
     <div class="row card">Ajuste mm: → <input id="dx" type="number" step="0.1" value="0" style="width:70px"> ↓
       <input id="dy" type="number" step="0.1" value="0" style="width:70px"> Ancho <input id="ancho" type="number" step="0.5" value="29" style="width:70px"></div>
@@ -201,6 +205,14 @@
       <input id="cliTel" type="tel" placeholder="Número / teléfono" autocomplete="off" maxlength="20" oninput="actualizarComp()" style="flex:1;min-width:0">
     </div>
     <input id="cliMail" type="email" placeholder="Correo del cliente" autocomplete="off" oninput="actualizarComp()" style="width:100%;margin-bottom:12px">
+    <label class="row" style="margin:8px 0">
+      <b>Papel térmico</b>
+      <select id="anchoPapelRecibo" onchange="guardarAnchoPapelRecibo()">
+        <option value="58">58 mm (largo automático)</option>
+        <option value="78" selected>78 mm (largo automático)</option>
+      </select>
+      <small>El sitio aplica el ancho y márgenes cero; el navegador aún solicita seleccionar la impresora.</small>
+    </label>
     <div id="compVista" class="recibo"></div>
     <div class="row" style="margin-top:12px">
       <button class="v" onclick="guardarComprobante()">Guardar comprobante</button>
