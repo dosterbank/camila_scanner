@@ -10,6 +10,8 @@ let tipoGraficaVentas = 'barras';
 let filasVentas = [];
 let productosVentas = [];
 let solicitudEstadisticasVentas = 0;
+let solicitudDetallePedido = 0;
+let botonDetalleAbierto = null;
 function estadoDe(id, mensaje, clase = '') {
   $(id).className = clase;
   $(id).textContent = mensaje;
@@ -121,6 +123,7 @@ function pintarPastelVentas(grafica) {
 }
 async function cargarCaja() {
   if (!uidActual) return;
+  cerrarDetallePedido();
   const fecha = $('fechaCaja').value || fechaLocalISO();
   $('cajaPedidos').innerHTML = '';
   $('cierresCaja').innerHTML = '';
@@ -144,7 +147,7 @@ async function cargarCaja() {
       <td>${esc(new Date(p.fecha).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }))}</td>
       <td>${esc(p.usuario || '')}</td><td>${esc(p.cliente_nombre || 'Consumidor final')}</td>
       <td>${Number(p.unidades || 0)}</td><td>${fmt(p.total)}</td>
-      <td><button type="button" data-detalle-pedido="${esc(p.numero)}">Ver detalle</button></td>
+      <td><button type="button" aria-expanded="false" data-detalle-pedido="${esc(p.numero)}">Ver detalle</button></td>
     </tr>`).join('');
     const historial = cierres.data || [];
     $('cierresCaja').innerHTML = historial.map(c => `<tr>
@@ -158,34 +161,93 @@ async function cargarCaja() {
     console.error('Error al cargar cierre de caja:', e);
   }
 }
-$('cajaPedidos').addEventListener('click', e => {
+document.addEventListener('click', e => {
   const button = e.target.closest('[data-detalle-pedido]');
-  if (button) verDetallePedido(button.dataset.detallePedido);
+  if (button) verDetallePedido(button);
 });
-async function verDetallePedido(numero) {
-  $('detalleTitulo').textContent = 'Pedido ' + numero;
-  $('detalleLineas').innerHTML = '';
-  $('detalleTotal').textContent = '';
-  estadoDe('detalleEstado', 'Cargando detalle…');
-  $('modalDetalleCaja').classList.remove('oculto');
-  const { data, error } = await db.rpc('detalle_pedido', { p_numero: numero });
+function cerrarDetallePedido() {
+  solicitudDetallePedido++;
+  if (!botonDetalleAbierto) return;
+  const filaDetalle = botonDetalleAbierto.closest('tr').nextElementSibling;
+  if (filaDetalle && filaDetalle.hasAttribute('data-detalle-fila')) filaDetalle.remove();
+  botonDetalleAbierto.setAttribute('aria-expanded', 'false');
+  botonDetalleAbierto.textContent = 'Ver detalle';
+  botonDetalleAbierto = null;
+}
+async function verDetallePedido(boton) {
+  if (boton === botonDetalleAbierto) {
+    cerrarDetallePedido();
+    return;
+  }
+  cerrarDetallePedido();
+  const numero = boton.dataset.detallePedido;
+  const solicitud = ++solicitudDetallePedido;
+  botonDetalleAbierto = boton;
+  boton.setAttribute('aria-expanded', 'true');
+  boton.textContent = 'Ocultar detalle';
+  const filaDetalle = document.createElement('tr');
+  filaDetalle.dataset.detalleFila = '';
+  filaDetalle.innerHTML = '<td colspan="6"><div class="pedido-detalle"><p role="status">Cargando detalle…</p></div></td>';
+  boton.closest('tr').after(filaDetalle);
+  let resultado;
+  try {
+    resultado = await db.rpc('detalle_pedido', { p_numero: numero });
+  } catch (error) {
+    if (solicitud !== solicitudDetallePedido || !filaDetalle.isConnected) return;
+    filaDetalle.querySelector('[role="status"]').className = 's';
+    filaDetalle.querySelector('[role="status"]').textContent = 'No se pudo cargar el detalle: ' + error.message;
+    console.error('Error al cargar detalle del pedido:', error);
+    return;
+  }
+  const { data, error } = resultado;
+  if (solicitud !== solicitudDetallePedido || !filaDetalle.isConnected) return;
   if (error) {
-    estadoDe('detalleEstado', 'No se pudo cargar el detalle: ' + error.message, 's');
+    filaDetalle.querySelector('[role="status"]').className = 's';
+    filaDetalle.querySelector('[role="status"]').textContent = 'No se pudo cargar el detalle: ' + error.message;
     return;
   }
   if (!data || !data.length) {
-    estadoDe('detalleEstado', 'No encontramos ese pedido.');
+    filaDetalle.querySelector('[role="status"]').textContent = 'No encontramos ese pedido.';
     return;
   }
   const p = data[0];
-  $('detalleLineas').innerHTML = (p.lineas || []).map(l => `<tr>
+  const lineas = (p.lineas || []).map(l => `<tr>
     <td>${esc(l.codigo)}</td><td>${esc(l.nombre)}</td><td>${Number(l.cantidad || 0)}</td>
     <td>${l.precio_unitario == null ? '—' : fmt(l.precio_unitario)}</td><td>${fmt(l.subtotal)}</td>
   </tr>`).join('');
-  $('detalleTotal').textContent = `Total: ${fmt(p.total)} · Cliente: ${p.cliente_nombre || 'Consumidor final'}`;
-  estadoDe('detalleEstado', '');
+  filaDetalle.querySelector('td').innerHTML = `<div class="pedido-detalle">
+    <strong>Detalle de ${esc(numero)} · ${esc(p.cliente_nombre || 'Consumidor final')}</strong>
+    <div class="lista"><table class="detalle-lineas"><thead><tr><th>Código</th><th>Producto</th><th>Cantidad</th><th>Precio</th><th>Subtotal</th></tr></thead><tbody>${lineas}</tbody></table></div>
+    <p class="caja-total">Total: ${fmt(p.total)}</p>
+  </div>`;
 }
-function cerrarDetalleCaja() { $('modalDetalleCaja').classList.add('oculto'); }
+async function cargarComprobantes() {
+  if (!uidActual) return;
+  cerrarDetallePedido();
+  const fecha = $('fechaComprobantes').value || fechaLocalISO();
+  $('comprobantesPedidos').replaceChildren();
+  estadoDe('comprobantesEstado', 'Cargando comprobantes…');
+  try {
+    const { data, error } = await db.rpc('comprobantes_dia', {
+      p_fecha: fecha, p_zona: zonaHorariaLocal()
+    });
+    if (error) throw error;
+    const filas = data || [];
+    $('comprobantesPedidos').innerHTML = filas.map(p => `<tr>
+      <td>${esc(new Date(p.fecha).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }))}</td>
+      <td>${esc(p.numero)}</td><td>${esc(p.usuario || '')}</td>
+      <td>${esc(p.cliente_nombre || 'Consumidor final')}</td>
+      <td>${Number(p.unidades || 0)}</td><td>${fmt(p.total)}</td>
+      <td><button type="button" aria-expanded="false" data-detalle-pedido="${esc(p.numero)}">Ver detalle</button></td>
+    </tr>`).join('');
+    estadoDe('comprobantesEstado', filas.length
+      ? `${filas.length} comprobante(s)${filas.length === 5000 ? ' · mostrando los 5000 más recientes' : ''}.`
+      : 'No hay comprobantes para esta fecha.');
+  } catch (e) {
+    estadoDe('comprobantesEstado', 'No se pudieron cargar los comprobantes: ' + e.message, 's');
+    console.error('Error al cargar comprobantes:', e);
+  }
+}
 async function cerrarCajaSinNovedades() {
   if (!uidActual) return;
   if (!confirm('¿Registrar el cierre global de caja para esta fecha como «Sin novedades»?')) return;

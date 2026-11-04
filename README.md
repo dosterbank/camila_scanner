@@ -36,7 +36,7 @@ Abre <http://localhost:8000>. No abras `index.html` directamente como archivo: l
 4. Añade esa URL, incluyendo la ruta del repositorio si corresponde, a las URL permitidas de Supabase Authentication.
 5. Prueba el inicio de sesión, escaneo, inventario, ventas y cierre de caja con las cuentas y permisos apropiados.
 
-Las estadísticas ofrecen tres periodos: hoy, los últimos siete días (incluido hoy) y cada día del mes actual. El control secundario cambia entre barras de ventas y el gráfico circular de unidades vendidas por producto. El gráfico circular muestra primero el producto más vendido. Al actualizar `supabase-pedidos.sql`, vuelve a ejecutarlo en Supabase para instalar o actualizar las funciones de estadísticas, incluido el desglose por producto.
+Las estadísticas ofrecen tres periodos: hoy, los últimos siete días (incluido hoy) y cada día del mes actual. El control secundario cambia entre barras de ventas y el gráfico circular de unidades vendidas por producto. El gráfico circular muestra primero el producto más vendido. El menú **Revisar comprobantes** permite consultar las ventas de una fecha y desplegar el detalle de cada pedido. Al actualizar `supabase-pedidos.sql`, vuelve a ejecutarlo en Supabase para instalar o actualizar las funciones de estadísticas y consulta de comprobantes.
 
 Las referencias a CSS y JavaScript son relativas para que también funcionen cuando el sitio se publica bajo una ruta de repositorio.
 

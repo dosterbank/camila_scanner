@@ -106,10 +106,12 @@ function lineas() {
     return { ...l, precioTipo, precio, sub: precio == null ? 0 : Math.round(precio * l.cant * 100) / 100 };
   });
 }
-$('lista').addEventListener('change', e => {
-  const codigo = e.target.dataset && e.target.dataset.codigo;
-  const tipo = e.target.value;
+$('lista').addEventListener('click', e => {
+  const boton = e.target.closest('[data-codigo][data-precio]');
+  const codigo = boton && boton.dataset.codigo;
+  const tipo = boton && boton.dataset.precio;
   if (codigo === undefined || !['precio_normal', 'precio_en_vivo', 'precio_mayorista'].includes(tipo)) return;
+  if (boton.disabled) return;
   precioElegido[codigo] = tipo;
   pintarPedido();
   if (compActual) prepararComprobante();
@@ -118,11 +120,11 @@ function pintarPedido() {
   const ls = lineas(), cls = delta < 0 ? 's' : 'e';
   $('lista').innerHTML = ls.slice().reverse().map(l =>
     `<tr class="${cls}"><td>${esc(l.nombre)}<br><small>${esc(l.codigo)}${l.pendiente ? ' · guardando…' : ''}</small></td>
-     <td><b>${l.cant}</b></td><td><div class="precios">${[
+     <td><b>${l.cant}</b></td><td><div class="precios period-control" role="group" aria-label="Precio de ${esc(l.nombre)}">${[
        ['precio_normal', 'Normal'], ['precio_en_vivo', 'TikTok'], ['precio_mayorista', 'Mayorista']
      ].map(([tipo, etiqueta]) => {
        const p = indice.get(l.codigo), valor = p && p[tipo], seleccionado = (precioElegido[l.codigo] || 'precio_en_vivo') === tipo;
-       return `<label><input type="radio" name="precio-${esc(l.codigo)}" data-codigo="${esc(l.codigo)}" value="${tipo}" ${seleccionado ? 'checked' : ''} ${valor == null || valor === '' ? 'disabled' : ''}>${etiqueta} ${valor == null || valor === '' ? '—' : fmt(valor)}</label>`;
+       return `<button type="button" class="precio-opcion${seleccionado ? ' activo' : ''}" data-codigo="${esc(l.codigo)}" data-precio="${tipo}" aria-pressed="${seleccionado}" ${valor == null || valor === '' ? 'disabled' : ''}><span>${etiqueta}</span><b>${valor == null || valor === '' ? '—' : fmt(valor)}</b></button>`;
      }).join('')}</div></td><td>${fmt(l.sub)}</td></tr>`).join('');
   $('errores').innerHTML = pedido.filter(i => i.estado === 'error').map(i =>
     `<li class="s"><span>${esc(i.codigo)}: ${esc(i.nombre)}</span></li>`).join('');

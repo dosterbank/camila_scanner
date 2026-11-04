@@ -129,7 +129,7 @@ begin
   end if;
   if p_operacion not in (
       'buscar_cliente', 'guardar_pedido', 'estadisticas_ventas', 'productos_mas_vendidos',
-      'ventas_caja_dia', 'resumen_caja_dia', 'historial_cierres_caja',
+      'ventas_caja_dia', 'comprobantes_dia', 'resumen_caja_dia', 'historial_cierres_caja',
       'detalle_pedido', 'cerrar_caja'
     )
     or p_maximo < 1 or p_maximo > 100 then
@@ -522,6 +522,36 @@ begin
 end;
 $$;
 
+create or replace function public.comprobantes_dia(p_fecha date, p_zona text)
+returns table (
+  numero text, fecha timestamptz, usuario text, cliente_nombre text, unidades integer, total numeric
+)
+language plpgsql
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'Se requiere una sesion iniciada.';
+  end if;
+  if p_fecha is null
+    or p_zona is null
+    or not exists (select 1 from pg_catalog.pg_timezone_names z where z.name = p_zona) then
+    raise exception 'Fecha o zona horaria no validas.';
+  end if;
+  if not public.comprobar_limite_rpc('comprobantes_dia', 30) then
+    raise exception 'Demasiadas consultas. Espera un minuto e intenta de nuevo.';
+  end if;
+  return query
+  select p.numero, p.fecha, p.usuario, p.cliente_nombre, p.unidades, p.total
+  from public.pedidos p
+  where p.fecha >= (p_fecha::timestamp at time zone p_zona)
+    and p.fecha < ((p_fecha + 1)::timestamp at time zone p_zona)
+  order by p.fecha desc
+  limit 5000;
+end;
+$$;
+
 create or replace function public.resumen_caja_dia(p_fecha date, p_zona text)
 returns table (pedidos bigint, unidades bigint, total numeric)
 language plpgsql
@@ -653,6 +683,7 @@ $$;
 revoke all on function public.estadisticas_ventas(text, date, text) from public, anon;
 revoke all on function public.productos_mas_vendidos(text, date, text) from public, anon;
 revoke all on function public.ventas_caja_dia(date, text) from public, anon;
+revoke all on function public.comprobantes_dia(date, text) from public, anon;
 revoke all on function public.resumen_caja_dia(date, text) from public, anon;
 revoke all on function public.historial_cierres_caja(date) from public, anon;
 revoke all on function public.detalle_pedido(text) from public, anon;
@@ -660,6 +691,7 @@ revoke all on function public.cerrar_caja_sin_novedades(date, text) from public,
 grant execute on function public.estadisticas_ventas(text, date, text) to authenticated;
 grant execute on function public.productos_mas_vendidos(text, date, text) to authenticated;
 grant execute on function public.ventas_caja_dia(date, text) to authenticated;
+grant execute on function public.comprobantes_dia(date, text) to authenticated;
 grant execute on function public.resumen_caja_dia(date, text) to authenticated;
 grant execute on function public.historial_cierres_caja(date) to authenticated;
 grant execute on function public.detalle_pedido(text) to authenticated;

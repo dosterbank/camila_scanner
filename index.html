@@ -43,6 +43,7 @@
     <button id="btnCodigos" class="menu-link oculto" onclick="vista('cod')">Crear código nuevo</button>
     <button id="btnVentas" class="menu-link oculto" onclick="vista('ventas')">Estadísticas de ventas</button>
     <button id="btnCaja" class="menu-link" onclick="vista('caja')">Cierre de caja</button>
+    <button id="btnComprobantes" class="menu-link" onclick="vista('comprobantes')">Revisar comprobantes</button>
   </nav>
 
   <!-- ========== ESCÁNER ========== -->
@@ -157,6 +158,17 @@
       <div class="lista"><table><thead><tr><th>Fecha y hora</th><th>Usuario que cerró</th><th>Pedidos</th><th>Unidades</th><th>Total</th><th>Novedades</th></tr></thead><tbody id="cierresCaja"></tbody></table></div>
     </div>
   </div>
+
+  <div id="comprobantes" class="oculto">
+      <div class="card">
+        <div class="row" style="justify-content:space-between">
+          <div><h2 style="margin:0">Revisar comprobantes</h2><small>Ventas registradas para el día seleccionado</small></div>
+          <label>Fecha <input id="fechaComprobantes" type="date" onchange="cargarComprobantes()"></label>
+        </div>
+        <p id="comprobantesEstado" role="status"></p>
+        <div class="lista"><table id="tablaComprobantes"><thead><tr><th>Hora</th><th>N.º comprobante</th><th>Usuario</th><th>Cliente</th><th>Unidades</th><th>Total</th><th>Detalle</th></tr></thead><tbody id="comprobantesPedidos"></tbody></table></div>
+    </div>
+  </div>
 </div>
 
 <!-- ========== ALERTA: PRODUCTO SIN NOMBRE (no se puede cerrar) ========== -->
@@ -180,14 +192,6 @@
       <button type="button" onclick="buscarClienteAnterior()">Buscar cliente</button>
     </div>
 
-    <div id="modalDetalleCaja" class="modal oculto" role="dialog" aria-modal="true" aria-labelledby="detalleTitulo">
-      <div class="caja" style="max-width:680px">
-        <div class="row" style="justify-content:space-between"><h3 id="detalleTitulo" style="margin:0">Detalle del pedido</h3><button onclick="cerrarDetalleCaja()">Cerrar</button></div>
-        <p id="detalleEstado" role="status"></p>
-        <div class="lista"><table class="detalle-lineas"><thead><tr><th>Código</th><th>Producto</th><th>Cantidad</th><th>Precio</th><th>Subtotal</th></tr></thead><tbody id="detalleLineas"></tbody></table></div>
-        <p id="detalleTotal" class="caja-total"></p>
-      </div>
-    </div>
     <p id="clienteEstado" style="margin:0 0 8px"></p>
     <label class="row" style="margin:8px 0;gap:6px"><input type="checkbox" id="cfinal" onchange="actualizarComp()" style="width:auto"> Consumidor final (sin nombre)</label>
     <input id="cliNom" placeholder="Nombre del cliente" autocomplete="off" oninput="actualizarComp()" style="width:100%;margin-bottom:6px">

@@ -138,7 +138,7 @@ document.addEventListener('keydown', e => { if (e.key === 'Escape') alternarMenu
 function vista(v) {
   if (v === 'cod' && !esAdmin) v = 'inicio';   // crear códigos: solo admin
   if (v === 'ventas' && !esAdmin) v = 'inicio';
-  ['inicio', 'etq', 'adm', 'cod', 'ventas', 'caja'].forEach(x => $(x).classList.toggle('oculto', x !== v));
+  ['inicio', 'etq', 'adm', 'cod', 'ventas', 'caja', 'comprobantes'].forEach(x => $(x).classList.toggle('oculto', x !== v));
   alternarMenu(false);
   if (v === 'inicio' && delta) document.body.className = delta > 0 ? 'entrada' : 'salida';
   else document.body.className = '';
@@ -149,6 +149,7 @@ function vista(v) {
   if (v === 'cod') abrirCodigos();
   if (v === 'ventas') cargarEstadisticasVentas();
   if (v === 'caja') cargarCaja();
+  if (v === 'comprobantes') cargarComprobantes();
   if (v === 'inicio' && !$('codigo').disabled) $('codigo').focus();
 }
 async function cargarRol(uid, intento = 0) {
