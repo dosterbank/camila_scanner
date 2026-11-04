@@ -1,0 +1,90 @@
+// ---------- ADMIN ----------
+async function cargarAdmin() {
+  try {
+    // Los no admin piden solo las columnas que necesitan
+    prods = await traerTodos(esAdmin ? '*' : 'id,codigo,nombre,cantidad,precio_normal,precio_en_vivo,precio_mayorista');
+  } catch (e) { return alert(e.message); }
+  prods.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es'));
+  pintarAdm();
+}
+const prVer = v => v == null || v === '' ? '—' : fmt(v);
+function admFiltrados() {
+  const q = $('admBuscar').value.toLowerCase().trim();
+  return prods.filter(p => !q || (p.nombre || '').toLowerCase().includes(q) || p.codigo.includes(q));
+}
+function imprimirInventario() {
+  const lista = admFiltrados();
+  if (!lista.length) return alert('No hay productos para imprimir (¿ya cargó el inventario?).');
+  const q = $('admBuscar').value.trim();
+  const unid = lista.reduce((a, p) => a + (Number(p.cantidad) || 0), 0);
+  const filas = lista.map(p => `<tr><td>${esc(p.codigo)}</td><td>${esc(p.nombre)}</td><td class="d">${p.cantidad}</td><td class="d">${prVer(p.precio_normal)}</td><td class="d">${prVer(p.precio_en_vivo)}</td><td class="d">${prVer(p.precio_mayorista)}</td></tr>`).join('');
+  const css = `@page{size:A4;margin:12mm}body{font:11pt Arial,sans-serif;color:#000;margin:0}
+h1{font-size:16pt;margin:0}.meta{font-size:9pt;color:#333;margin:2mm 0 4mm}
+table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #bbb;padding:1.6mm 1.5mm;text-align:left;font-size:9.5pt}
+th{border-bottom:2px solid #000}thead{display:table-header-group}tr{break-inside:avoid}.d{text-align:right}
+tfoot td{border-top:2px solid #000;border-bottom:0;font-weight:bold}`;
+  const w = window.open('', '_blank'); if (!w) return alert('Permite las ventanas emergentes.');
+  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Inventario</title><style>${css}</style></head><body>
+<h1>Inventario · Distribuidora Camila</h1>
+<div class="meta">Fecha: ${fechaTxt(new Date())} · Usuario: ${esc(usuarioEmail)}${q ? ' · Filtro: «' + esc(q) + '»' : ''}</div>
+<table><thead><tr><th>Código</th><th>Nombre</th><th class="d">Stock</th><th class="d">Normal</th><th class="d">TikTok</th><th class="d">Mayorista</th></tr></thead><tbody>${filas}</tbody>
+<tfoot><tr><td colspan="2">${lista.length} producto(s)</td><td class="d">${unid}</td><td colspan="3"></td></tr></tfoot></table></body></html>`);
+  w.document.close(); w.focus(); setTimeout(() => w.print(), 400);
+}
+function pintarAdm() {
+  const todos = admFiltrados(), lista = todos.slice(0, 300);
+  $('admCount').textContent = `Mostrando ${lista.length} de ${todos.length} producto(s)` + (todos.length > 300 ? ' · usa el buscador para acotar; al imprimir salen todos' : '');
+  const et = p => `<td><button data-et="${esc(p.codigo)}" title="Imprimir etiqueta">🏷</button></td>`;
+  if (!esAdmin) {   // solo lectura
+    $('admHead').innerHTML = '<tr><th>Código</th><th>Nombre</th><th>Stock</th><th>Normal</th><th>TikTok</th><th>Mayorista</th><th>Etiq.</th></tr>';
+    $('admCuerpo').innerHTML = lista.map(p =>
+      `<tr><td>${esc(p.codigo)}</td><td>${esc(p.nombre)}</td><td><b style="${p.cantidad < 0 ? 'color:#9b2226' : ''}">${p.cantidad}</b></td>
+       <td>${prVer(p.precio_normal)}</td><td>${prVer(p.precio_en_vivo)}</td><td>${prVer(p.precio_mayorista)}</td>${et(p)}</tr>`).join('');
+    return;
+  }
+  $('admHead').innerHTML = '<tr><th>Código</th><th>Nombre</th><th>Stock</th><th>Normal</th><th>TikTok</th><th>Mayorista</th><th>Etiq.</th></tr>';
+  const num = (id, c, v) => `<td><input class="adm-precio" type="number" step="0.01" value="${v ?? ''}" onchange="guardarCampo(${id},'${c}',this.value)"></td>`;
+  $('admCuerpo').innerHTML = lista.map(p =>
+    `<tr><td>${esc(p.codigo)}</td><td><input class="adm-nombre" value="${esc(p.nombre)}" oninput="this.style.width=Math.max(20,Math.min(60,this.value.length+2)+'ch')" onchange="guardarCampo(${p.id},'nombre',this.value)" style="width:${Math.max(20, Math.min(60, String(p.nombre || '').length + 2))}ch"></td>
+     <td><input type="number" value="${p.cantidad}" onchange="ajustarStock(${p.id},this.value)" style="width:70px;${p.cantidad < 0 ? 'color:#9b2226' : ''}"></td>
+     ${num(p.id, 'precio_normal', p.precio_normal)}${num(p.id, 'precio_en_vivo', p.precio_en_vivo)}${num(p.id, 'precio_mayorista', p.precio_mayorista)}${et(p)}</tr>`).join('');
+}
+// Desde el inventario: manda el producto a Etiquetas con cantidad 1
+$('admCuerpo').addEventListener('click', e => {
+  const c = e.target.dataset && e.target.dataset.et;
+  if (c === undefined) return;
+  cant[c] = 1; vista('etq'); $('buscar').value = c; pintarCat();
+});
+async function guardarCampo(id, campo, v) {
+  if (!esAdmin) return;
+  const p = prods.find(x => x.id === id);
+  const val = campo === 'nombre' ? v.trim() : (v === '' ? null : parseFloat(v));
+  if (campo === 'nombre' && !val) { alert('El nombre no puede quedar vacío.'); return pintarAdm(); }
+  const { error } = await db.from('productos').update({ [campo]: val }).eq('id', id);
+  if (error) { alert(error.message); return pintarAdm(); }
+  p[campo] = val;
+  const c = indice.get(p.codigo); if (c) c[campo] = val;   // mantiene el catálogo del escáner al día
+}
+// El stock se ajusta como un movimiento, así queda registro en el historial
+async function ajustarStock(id, v) {
+  if (!esAdmin) return;
+  const p = prods.find(x => x.id === id), d = (parseInt(v) || 0) - p.cantidad;
+  if (!d) return;
+  if (!confirm(`Ajustar "${p.nombre}": ${p.cantidad} → ${p.cantidad + d}?`)) return pintarAdm();
+  const { data, error } = await db.rpc('registrar_movimiento', { p_codigo: p.codigo, p_cantidad: d });
+  if (error) alert(error.message); else p.cantidad = data.total;
+  pintarAdm();
+}
+async function reporte() {
+  let q = db.from('movimientos').select('created_at,nombre,cantidad,tipo,usuario').order('created_at', { ascending: false }).limit(1000);
+  if ($('desde').value) q = q.gte('created_at', new Date($('desde').value + 'T00:00:00').toISOString());
+  if ($('hasta').value) q = q.lte('created_at', new Date($('hasta').value + 'T23:59:59').toISOString());
+  if ($('fTipo').value) q = q.eq('tipo', $('fTipo').value);
+  if ($('fUsuario').value.trim()) q = q.ilike('usuario', '%' + $('fUsuario').value.trim() + '%');
+  const { data, error } = await q;
+  if (error) return alert(error.message);
+  const ent = data.filter(m => m.cantidad > 0).reduce((a, m) => a + m.cantidad, 0);
+  const sal = data.filter(m => m.cantidad < 0).reduce((a, m) => a - m.cantidad, 0);
+  $('repResumen').textContent = `Entradas: ${ent} · Descargos: ${sal}` + (data.length === 1000 ? ' (mostrando los 1000 más recientes)' : '');
+  $('repCuerpo').innerHTML = data.map(m => `<tr class="${m.cantidad < 0 ? 's' : 'e'}"><td>${new Date(m.created_at).toLocaleString()}</td><td>${esc(m.nombre || '')}</td><td>${esc(m.usuario || '')}</td><td><b>${m.cantidad > 0 ? '+' : ''}${m.cantidad}</b></td></tr>`).join('');
+}

@@ -5,39 +5,16 @@
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jsbarcode/3.11.6/JsBarcode.all.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-<style>
-*{box-sizing:border-box}body{margin:0;padding:16px;font:16px/1.4 Arial,sans-serif;background:#eef0ea;color:#141a17;max-width:760px;margin:auto}
-body.entrada{background:#2f8a5c}body.salida{background:#b53a3f}
-input,button,select{font:inherit;padding:10px 12px;border:1px solid #c9cec3;border-radius:6px}
-button{cursor:pointer;background:#141a17;color:#fff;font-weight:600}
-button:disabled{opacity:.5;cursor:not-allowed}
-.v{background:#1f6f4a}.r{background:#9b2226}.card{background:#fff;border-radius:8px;padding:12px;margin:10px 0}
-.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}#codigo{flex:1;font-size:20px}
-li{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee;list-style:none}
-ul{margin:0;padding:0}.e{color:#1f6f4a}.s{color:#9b2226}
-table{width:100%;border-collapse:collapse}td,th{padding:5px;border-bottom:1px solid #eee;text-align:left}
-td input{width:60px}.lista{max-height:420px;overflow:auto}
-.warn{background:#fff3cd;border:1px solid #e0b100}
-.totalbox{display:flex;justify-content:space-between;align-items:center;font-size:22px;margin:10px 0 6px;padding-top:8px;border-top:2px solid #141a17}
-.chip{background:#fff;color:#141a17;border:2px solid #141a17;font-size:18px;min-width:78px}
-.chip:hover{background:#1f6f4a;color:#fff;border-color:#1f6f4a}
-.modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;padding:16px;z-index:50}
-.caja{background:#fff;border-radius:10px;padding:18px;max-width:420px;width:100%;max-height:92vh;overflow:auto}
-.caja.alerta{border:4px solid #e0b100}
-.combo{position:relative;display:flex;flex:1;min-width:220px}
-.combo input{flex:1;min-width:0;border-radius:6px 0 0 6px}
-.flecha{border-radius:0 6px 6px 0;background:#fff;color:#141a17;border:1px solid #c9cec3;border-left:0;padding:10px 12px}
-#listaCorreos{position:absolute;top:100%;left:0;right:0;margin-top:2px;background:#fff;border:1px solid #c9cec3;border-radius:6px;box-shadow:0 4px 12px rgba(0,0,0,.18);z-index:10;max-height:240px;overflow:auto}
-.opc{display:flex;justify-content:space-between;align-items:center;padding:8px 10px;cursor:pointer}
-.opc:hover{background:#eef0ea}.opc button{background:none;color:#9b2226;border:0;padding:0 6px;font-size:16px}
-.oculto{display:none!important}
-</style></head><body>
+<link rel="stylesheet" href="css/styles.css"></head><body>
 
-<div id="login" class="card oculto">
+<div id="login" class="card login-card oculto">
+  <div class="login-avatar" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Zm0 2c-4.1 0-7.5 2.1-7.5 4.7V21h15v-2.3c0-2.6-3.4-4.7-7.5-4.7Z"/></svg></div>
   <h2>Inventario Camila</h2>
-  <div class="row"><div class="combo"><input id="email" type="email" placeholder="Correo" autocomplete="off"><button type="button" class="flecha" onclick="alternarCorreos()" title="Correos usados antes">▾</button><div id="listaCorreos" class="oculto"></div></div><input id="pass" type="password" placeholder="Contraseña" autocomplete="off">
-  <button onclick="entrar()">Entrar</button></div><p id="errLogin" class="s"></p><p id="okLogin" class="e"></p>
-  <p style="margin:0"><a href="#" onclick="olvide();return false">¿Olvidaste tu contraseña?</a></p>
+  <label class="login-field"><span>Correo</span><div class="combo"><input id="email" type="email" placeholder="tu@correo.com" autocomplete="username"><button type="button" class="flecha" onclick="alternarCorreos()" title="Correos usados antes">▾</button><div id="listaCorreos" class="oculto"></div></div></label>
+  <label class="login-field"><span>Contraseña</span><input id="pass" type="password" placeholder="Contraseña" autocomplete="current-password"></label>
+  <button class="login-submit" onclick="entrar()">Entrar</button>
+  <p id="errLogin" class="s"></p><p id="okLogin" class="e"></p>
+  <div class="login-links"><span>Acceso seguro</span><a href="#" onclick="olvide();return false">¿Olvidaste tu contraseña?</a></div>
 </div>
 
 <div id="clave" class="card oculto">
@@ -62,6 +39,8 @@ td input{width:60px}.lista{max-height:420px;overflow:auto}
     <button onclick="vista('etq')">Etiquetas</button>
     <button id="btnAdmin" onclick="vista('adm')">Inventario</button>
     <button id="btnCodigos" class="oculto" onclick="vista('cod')">Crear código nuevo</button>
+    <button id="btnVentas" class="oculto" onclick="vista('ventas')">Estadísticas de ventas</button>
+    <button id="btnCaja" onclick="vista('caja')">Cierre de caja</button>
   </div>
 
   <!-- ========== ESCÁNER ========== -->
@@ -78,7 +57,7 @@ td input{width:60px}.lista{max-height:420px;overflow:auto}
         <button onclick="nuevoPedido()">Nuevo pedido</button>
       </div>
       <div class="lista" style="max-height:320px">
-        <table><thead><tr><th>Producto</th><th>Cant.</th><th>P. normal</th><th>Subtotal</th></tr></thead><tbody id="lista"></tbody></table>
+        <table><thead><tr><th>Producto</th><th>Cant.</th><th>Precio unitario</th><th>Subtotal</th></tr></thead><tbody id="lista"></tbody></table>
       </div>
       <ul id="errores"></ul>
       <div class="totalbox"><span id="lblTotal">Total</span><b id="totalDin">$0.00</b></div>
@@ -136,6 +115,42 @@ td input{width:60px}.lista{max-height:420px;overflow:auto}
     </div>
     <div class="card"><b>Creados en esta sesión</b><ul id="creados"></ul></div>
   </div>
+
+  <div id="ventas" class="oculto">
+    <div class="card">
+      <h2 style="margin-top:0">Estadísticas de ventas</h2>
+      <div class="row">
+        <label>Periodo
+          <select id="periodoVentas" onchange="cargarEstadisticasVentas()">
+            <option value="dia">Por día · últimos 30 días</option>
+            <option value="semana">Por semana · últimas 12 semanas</option>
+            <option value="mes">Por mes · últimos 12 meses</option>
+          </select>
+        </label>
+        <label>Fecha de referencia <input id="fechaVentas" type="date" onchange="cargarEstadisticasVentas()"></label>
+      </div>
+      <p id="ventasEstado" role="status"></p>
+      <p id="ventasResumen" class="caja-total"></p>
+      <div id="graficaVentas" class="chart" role="img" aria-label="Ventas agrupadas por periodo"></div>
+    </div>
+  </div>
+
+  <div id="caja" class="oculto">
+    <div class="card">
+      <div class="row" style="justify-content:space-between">
+        <div><h2 style="margin:0">Cierre de caja</h2><small>Resumen global de ventas del día</small></div>
+        <label>Fecha <input id="fechaCaja" type="date" onchange="cargarCaja()"></label>
+      </div>
+      <p id="cajaEstado" role="status"></p>
+      <p id="cajaResumen" class="caja-total"></p>
+      <div class="lista"><table id="tablaCaja"><thead><tr><th>Hora</th><th>Usuario</th><th>Cliente</th><th>Unidades</th><th>Total</th><th>Detalle</th></tr></thead><tbody id="cajaPedidos"></tbody></table></div>
+      <button id="btnCerrarCaja" class="v" style="margin-top:12px" onclick="cerrarCajaSinNovedades()">Cerrar Caja sin Novedades</button>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Cierres registrados</h3>
+      <div class="lista"><table><thead><tr><th>Fecha y hora</th><th>Usuario que cerró</th><th>Pedidos</th><th>Unidades</th><th>Total</th><th>Novedades</th></tr></thead><tbody id="cierresCaja"></tbody></table></div>
+    </div>
+  </div>
 </div>
 
 <!-- ========== ALERTA: PRODUCTO SIN NOMBRE (no se puede cerrar) ========== -->
@@ -154,6 +169,20 @@ td input{width:60px}.lista{max-height:420px;overflow:auto}
 <div id="modalComp" class="modal oculto">
   <div class="caja">
     <b>Datos del cliente <small>(todo opcional)</small></b>
+    <div class="row" style="margin:8px 0">
+      <input id="buscarCliente" placeholder="Cédula/RUC o correo de un cliente anterior" autocomplete="off" style="flex:1;min-width:200px">
+      <button type="button" onclick="buscarClienteAnterior()">Buscar cliente</button>
+    </div>
+
+    <div id="modalDetalleCaja" class="modal oculto" role="dialog" aria-modal="true" aria-labelledby="detalleTitulo">
+      <div class="caja" style="max-width:680px">
+        <div class="row" style="justify-content:space-between"><h3 id="detalleTitulo" style="margin:0">Detalle del pedido</h3><button onclick="cerrarDetalleCaja()">Cerrar</button></div>
+        <p id="detalleEstado" role="status"></p>
+        <div class="lista"><table class="detalle-lineas"><thead><tr><th>Código</th><th>Producto</th><th>Cantidad</th><th>Precio</th><th>Subtotal</th></tr></thead><tbody id="detalleLineas"></tbody></table></div>
+        <p id="detalleTotal" class="caja-total"></p>
+      </div>
+    </div>
+    <p id="clienteEstado" style="margin:0 0 8px"></p>
     <label class="row" style="margin:8px 0;gap:6px"><input type="checkbox" id="cfinal" onchange="actualizarComp()" style="width:auto"> Consumidor final (sin nombre)</label>
     <input id="cliNom" placeholder="Nombre del cliente" autocomplete="off" oninput="actualizarComp()" style="width:100%;margin-bottom:6px">
     <div class="row" style="margin-bottom:6px;flex-wrap:nowrap">
@@ -167,622 +196,15 @@ td input{width:60px}.lista{max-height:420px;overflow:auto}
       <button onclick="imprimirComprobante()">Imprimir</button>
       <button onclick="cerrarComp()">Cerrar</button>
     </div>
+    <p id="estadoPedido" role="status" style="margin:8px 0 0"></p>
   </div>
 </div>
 
-<script>
-// ====== CONFIGURA ESTO (Supabase > Project Settings > API) ======
-const SUPABASE_URL = 'https://zfeazyxionredunjqxdx.supabase.co';
-const SUPABASE_KEY = 'sb_publishable_W1HNg5ZTFEEi3SegFC5r0A_RzFSOZiO';   // clave pública (publishable); la seguridad la da RLS
-// ================================================================
-// Enlace del correo (invitación / recuperar contraseña): Supabase lo manda con datos en el # de la dirección
-const hashParams = new URLSearchParams(location.hash.slice(1));
-let modoClave = ['invite', 'recovery', 'signup'].includes(hashParams.get('type'));
-const errorEnlace = hashParams.get('error') ? 'El enlace del correo expiró o ya fue usado. Pulsa «¿Olvidaste tu contraseña?» para recibir uno nuevo.' : '';
-if (errorEnlace) history.replaceState(null, '', location.pathname + location.search);
-const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
-const $ = id => document.getElementById(id);
-const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const fmt = n => '$' + (Math.round((Number(n) || 0) * 100) / 100).toFixed(2);
-const sinNombre = n => { const t = (n || '').trim(); return !t || /^sin nombre$/i.test(t); };
-const nombreValido = n => n.length >= 2 && /[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/.test(n) && !sinNombre(n);
-
-let delta = 0, pedido = [], catalogo = [], indice = new Map(), cant = {}, cola = Promise.resolve();
-let esAdmin = false, rolCargado = false, prods = [], uidActual = null, usuarioEmail = '';
-let bloqueo = null, descartados = 0, compActual = null, avisoT = null;
-
-// ---------- SESIÓN ----------
-async function iniciar() {
-  const { data: { session } } = await db.auth.getSession();
-  mostrar(session);
-}
-function reiniciarUI() {
-  delta = 0; pedido = []; catalogo = []; indice = new Map(); cant = {}; prods = [];
-  bloqueo = null; descartados = 0; compActual = null; esAdmin = false; cola = Promise.resolve();
-  document.body.className = '';
-  $('modoTxt').textContent = 'Elige un modo';
-  $('codigo').disabled = true; $('codigo').value = '';
-  limpiarCliente(); $('exist').textContent = '—'; $('aviso').classList.add('oculto'); $('zonaEscaneo').classList.add('oculto');
-  $('modalNombre').classList.add('oculto'); $('modalComp').classList.add('oculto');
-  $('btnCodigos').classList.add('oculto'); $('btnNuevoCod').classList.add('oculto'); $('admMov').classList.add('oculto');
-  $('menu').classList.add('oculto'); $('btnVolver').classList.add('oculto'); rolCargado = false;
-  pintarPedido();
-}
-function mostrar(session) {
-  const pideClave = !!session && modoClave;     // llegó por enlace del correo: primero debe crear su contraseña
-  $('login').classList.toggle('oculto', !!session);
-  $('clave').classList.toggle('oculto', !pideClave);
-  $('app').classList.toggle('oculto', !session || pideClave);
-  if (!session) { if (uidActual) reiniciarUI(); uidActual = null; cargarCorreos(); return; }
-  if (pideClave) { setTimeout(() => $('clave1').focus(), 50); return; }
-  $('quien').textContent = usuarioEmail = session.user.email;
-  // Solo se reinicia la pantalla cuando entra OTRO usuario (no en cada refresco de token)
-  if (session.user.id !== uidActual) {
-    uidActual = session.user.id;
-    reiniciarUI(); cargarRol(uidActual); vista('inicio');
-  }
-}
-// Solo se recuerdan los correos en este dispositivo; las contraseñas nunca se guardan
-function leerCorreos() { try { return JSON.parse(localStorage.getItem('correos') || '[]'); } catch (e) { return []; } }
-function guardarCorreo(c) {
-  try {
-    const lista = [c, ...leerCorreos().filter(x => x !== c)].slice(0, 10); // el último usado va primero
-    localStorage.setItem('correos', JSON.stringify(lista));
-  } catch (e) {}
-}
-function cargarCorreos() {
-  const lista = leerCorreos();
-  if (lista.length && !$('email').value) $('email').value = lista[0];
-}
-// Lista desplegable propia (la del navegador solo mostraba el correo que ya estaba escrito)
-function pintarCorreos() {
-  const lista = leerCorreos();
-  $('listaCorreos').innerHTML = lista.length
-    ? lista.map(c => `<div class="opc" data-c="${esc(c)}"><span>${esc(c)}</span><button type="button" data-del="${esc(c)}" title="Quitar de la lista">✕</button></div>`).join('')
-    : '<div class="opc" style="color:#777;cursor:default">Aún no hay correos guardados</div>';
-}
-function alternarCorreos() { pintarCorreos(); $('listaCorreos').classList.toggle('oculto'); }
-$('listaCorreos').addEventListener('click', e => {
-  const del = e.target.dataset && e.target.dataset.del;
-  if (del !== undefined) {                       // quitar un correo de la lista
-    e.stopPropagation();
-    try { localStorage.setItem('correos', JSON.stringify(leerCorreos().filter(x => x !== del))); } catch (err) {}
-    pintarCorreos(); return;
-  }
-  const o = e.target.closest('.opc');
-  if (o && o.dataset.c) { $('email').value = o.dataset.c; $('listaCorreos').classList.add('oculto'); $('pass').focus(); }
-});
-document.addEventListener('click', e => { if (!e.target.closest('.combo')) $('listaCorreos').classList.add('oculto'); });
-async function entrar() {
-  const correo = $('email').value.trim();
-  const { error } = await db.auth.signInWithPassword({ email: correo, password: $('pass').value });
-  if (error) {
-    $('okLogin').textContent = '';
-    $('errLogin').textContent = /not confirmed/i.test(error.message)
-      ? 'Tu correo aún no está confirmado. Pide al administrador que lo confirme.' : 'Correo o contraseña incorrectos.';
-    return;
-  }
-  modoClave = false;
-  guardarCorreo(correo); $('pass').value = ''; $('errLogin').textContent = ''; $('okLogin').textContent = ''; iniciar();
-}
-$('pass').addEventListener('keydown', e => { if (e.key === 'Enter') entrar(); });
-cargarCorreos();
-async function salir() { await db.auth.signOut(); iniciar(); }
-async function olvide() {
-  const c = $('email').value.trim();
-  $('okLogin').textContent = '';
-  if (!c) { $('errLogin').textContent = 'Escribe tu correo arriba y vuelve a pulsar «¿Olvidaste tu contraseña?».'; return; }
-  const { error } = await db.auth.resetPasswordForEmail(c, { redirectTo: location.origin + location.pathname });
-  if (error) { $('errLogin').textContent = /seconds|rate/i.test(error.message) ? 'Espera un minuto antes de pedir otro enlace.' : error.message; return; }
-  $('errLogin').textContent = '';
-  $('okLogin').textContent = 'Si el correo está registrado, te enviamos un enlace para crear una contraseña nueva. Revisa también la carpeta de spam.';
-}
-async function guardarClave() {
-  const a = $('clave1').value, b = $('clave2').value, err = t => { $('errClave').textContent = t; };
-  if (a.length < 8) return err('La contraseña debe tener al menos 8 caracteres.');
-  if (a !== b) return err('Las contraseñas no coinciden.');
-  const { error } = await db.auth.updateUser({ password: a });
-  if (error) return err(error.message);
-  modoClave = false; err(''); $('clave1').value = $('clave2').value = '';
-  history.replaceState(null, '', location.pathname + location.search);
-  iniciar();
-}
-$('clave2').addEventListener('keydown', e => { if (e.key === 'Enter') guardarClave(); });
-
-function alternarMenu() { $('menu').classList.toggle('oculto'); }
-function vista(v) {
-  if (v === 'cod' && !esAdmin) v = 'inicio';   // crear códigos: solo admin
-  ['inicio', 'etq', 'adm', 'cod'].forEach(x => $(x).classList.toggle('oculto', x !== v));
-  $('menu').classList.add('oculto');
-  $('btnVolver').classList.toggle('oculto', v === 'inicio');
-  if (!rolCargado && uidActual) cargarRol(uidActual);   // reintenta si el rol no se pudo leer
-  if (v === 'inicio' || v === 'etq') cargarCatalogo();
-  if (v === 'adm') { cargarAdmin(); if (esAdmin) reporte(); }
-  if (v === 'cod') abrirCodigos();
-  if (v === 'inicio' && !$('codigo').disabled) $('codigo').focus();
-}
-async function cargarRol(uid, intento = 0) {
-  const { data, error } = await db.from('perfiles').select('rol').eq('id', uid).maybeSingle();
-  if (uid !== uidActual) return;
-  if (error) {
-    console.error('No se pudo leer el rol:', error);
-    if (intento < 2) return setTimeout(() => cargarRol(uid, intento + 1), 1200);
-  }
-  rolCargado = !error;
-  esAdmin = !!data && String(data.rol || '').trim().toLowerCase() === 'admin';
-  // junto al correo se ve el rol detectado, para comprobar que quedó bien
-  $('quien').textContent = usuarioEmail + ' · ' + (error ? 'no se pudo leer el rol' : !data ? 'sin perfil' : esAdmin ? 'admin' : String(data.rol));
-  // Inventario lo ve todo el mundo (solo lectura); crear códigos y editar es solo admin
-  $('btnCodigos').classList.toggle('oculto', !esAdmin);
-  $('btnNuevoCod').classList.toggle('oculto', !esAdmin);
-  $('admMov').classList.toggle('oculto', !esAdmin);
-  if (!$('adm').classList.contains('oculto')) vista('adm');   // si ya estaba en Inventario, redibujar según el rol
-}
-
-// ---------- DATOS ----------
-// Supabase devuelve máx. 1000 filas por consulta: se pide por páginas
-async function traerTodos(cols) {
-  const out = [];
-  for (let d = 0; ; d += 1000) {
-    const { data, error } = await db.from('productos').select(cols).order('id').range(d, d + 999);
-    if (error) throw error;
-    out.push(...data);
-    if (data.length < 1000) break;
-  }
-  return out;
-}
-async function cargarCatalogo() {
-  try {
-    let data;
-    try { data = await traerTodos('id,codigo,nombre,precio_normal'); }
-    catch (e) { data = await traerTodos('id,codigo,nombre'); }   // si el rol no puede leer precios
-    data.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es'));
-    catalogo = data; indice = new Map(data.map(p => [p.codigo, p]));
-    pintarCat(); pintarPedido();
-  } catch (e) { console.error(e); }
-}
-function precioDe(codigo) {
-  const p = indice.get(codigo), v = p && p.precio_normal;
-  return v == null || v === '' ? null : Number(v);
-}
-
-// ---------- ESCÁNER ----------
-function modo(d) {
-  const t = d > 0 ? 'ENTRADAS: cada código SUMA 1.' : 'DESCARGOS: cada código RESTA 1.';
-  if (!confirm('Vas a registrar ' + t + ' ¿Continuar?')) return;
-  delta = d; pedido = []; limpiarCliente(); pintarPedido();
-  $('zonaEscaneo').classList.remove('oculto');
-  document.body.className = d > 0 ? 'entrada' : 'salida';
-  $('modoTxt').textContent = d > 0 ? 'Entradas' : 'Descargos';
-  $('codigo').disabled = false; $('codigo').focus();
-}
-$('codigo').addEventListener('keydown', e => {
-  if (e.key !== 'Enter') return;
-  e.preventDefault();
-  const codigo = $('codigo').value.trim(); $('codigo').value = '';
-  if (!codigo || !delta || bloqueo) return;
-  const p = indice.get(codigo);
-  // Código que ya existe pero sin nombre: no se registra nada hasta ponerle nombre
-  if (p && sinNombre(p.nombre)) { pedirNombre(codigo, true); return; }
-  encolar(codigo);
-});
-// Si el foco se pierde (clic en un botón, etc.), el escáner vuelve a escribir en el campo de código
-document.addEventListener('keydown', e => {
-  if (e.key.length !== 1 || e.key === ' ' || e.ctrlKey || e.metaKey || e.altKey) return;
-  if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
-  if ($('inicio').classList.contains('oculto') || $('codigo').disabled || bloqueo || !$('modalComp').classList.contains('oculto')) return;
-  $('codigo').focus();
-});
-
-function encolar(codigo) {
-  const item = { codigo, nombre: 'Registrando…', cantidad: delta, estado: 'pendiente' };
-  pedido.push(item); pintarPedido();
-  // cola: un escaneo a la vez, en orden (el servidor además lo hace atómico)
-  cola = cola.then(async () => {
-    if (bloqueo) {                       // hay un producto sin nombre pendiente: no se registra
-      pedido = pedido.filter(i => i !== item); descartados++; pintarPedido(); return;
-    }
-    const { data, error } = await db.rpc('registrar_movimiento', { p_codigo: codigo, p_cantidad: item.cantidad });
-    if (error) { item.estado = 'error'; item.nombre = error.message; }
-    else {
-      item.estado = 'ok'; item.nombre = data.nombre;
-      $('exist').textContent = data.nombre + ': ' + data.total;
-      if (data.sinNombre || sinNombre(data.nombre)) {
-        item.nombre = 'Sin nombre';
-        pedirNombre(data.codigo || codigo, false);   // ya quedó registrado; solo falta el nombre
-      } else if (!indice.has(codigo)) await cargarCatalogo();   // producto nuevo: traer su precio
-    }
-    pintarPedido();
-  });
-}
-function pedirNombre(codigo, registrarDespues) {
-  bloqueo = { codigo, reg: registrarDespues };
-  $('mCod').textContent = codigo; $('mNombre').value = ''; $('mErr').textContent = '';
-  $('modalNombre').classList.remove('oculto'); beep();
-  setTimeout(() => $('mNombre').focus(), 50);
-}
-async function guardarNombre() {
-  if (!bloqueo) return;
-  const n = $('mNombre').value.trim().replace(/\s+/g, ' ');
-  if (!nombreValido(n)) {
-    $('mErr').textContent = 'Escribe el nombre real del producto (con letras), no un código.';
-    $('mNombre').focus(); return;
-  }
-  const { codigo, reg } = bloqueo;
-  $('mBtn').disabled = true;
-  const { error } = await db.rpc('poner_nombre', { p_codigo: codigo, p_nombre: n });
-  $('mBtn').disabled = false;
-  if (error) { $('mErr').textContent = error.message; return; }
-  pedido.forEach(i => { if (i.codigo === codigo) i.nombre = n; });
-  const p = indice.get(codigo); if (p) p.nombre = n;
-  bloqueo = null; $('modalNombre').classList.add('oculto');
-  if (reg) encolar(codigo);              // ahora sí se registra el escaneo que estaba detenido
-  cargarCatalogo(); pintarPedido();
-  if (descartados) { avisar(`${descartados} escaneo(s) que estaban en espera no se registraron. Vuelve a escanearlos.`); descartados = 0; }
-  $('codigo').focus();
-}
-$('mNombre').addEventListener('keydown', e => {
-  if (e.key === 'Enter') { e.preventDefault(); guardarNombre(); }
-  if (e.key === 'Escape') e.preventDefault();      // no se puede saltar
-});
-function avisar(t) {
-  $('aviso').textContent = t; $('aviso').classList.remove('oculto');
-  clearTimeout(avisoT); avisoT = setTimeout(() => $('aviso').classList.add('oculto'), 9000);
-}
-function beep() { try { const c = new AudioContext(), o = c.createOscillator(); o.frequency.value = 880; o.connect(c.destination); o.start(); o.stop(c.currentTime + .25); } catch (e) {} }
-
-// Agrupa los escaneos por producto y calcula precios y totales
-function lineas() {
-  const m = new Map();
-  pedido.forEach(i => {
-    if (i.estado === 'error') return;
-    const l = m.get(i.codigo) || { codigo: i.codigo, nombre: i.nombre, cant: 0, pendiente: false };
-    m.delete(i.codigo);                                  // el último escaneado queda al final
-    const p = indice.get(i.codigo);
-    l.nombre = p && !sinNombre(p.nombre) ? p.nombre : i.nombre;
-    l.cant += Math.abs(i.cantidad);
-    l.pendiente = l.pendiente || i.estado === 'pendiente';
-    m.set(i.codigo, l);
-  });
-  return [...m.values()].map(l => {
-    const precio = precioDe(l.codigo);
-    return { ...l, precio, sub: precio == null ? 0 : Math.round(precio * l.cant * 100) / 100 };
-  });
-}
-function pintarPedido() {
-  const ls = lineas(), cls = delta < 0 ? 's' : 'e';
-  $('lista').innerHTML = ls.slice().reverse().map(l =>
-    `<tr class="${cls}"><td>${esc(l.nombre)}<br><small>${esc(l.codigo)}${l.pendiente ? ' · guardando…' : ''}</small></td>
-     <td><b>${l.cant}</b></td><td>${l.precio == null ? '<span class="s">sin precio</span>' : fmt(l.precio)}</td><td>${fmt(l.sub)}</td></tr>`).join('');
-  $('errores').innerHTML = pedido.filter(i => i.estado === 'error').map(i =>
-    `<li class="s"><span>${esc(i.codigo)}: ${esc(i.nombre)}</span></li>`).join('');
-  $('total').textContent = ls.reduce((a, l) => a + l.cant, 0);
-  $('totalDin').textContent = fmt(ls.reduce((a, l) => a + l.sub, 0));
-  $('lblTotal').textContent = delta > 0 ? 'Total entrada (precio normal)' : 'Total a pagar';
-  const sp = ls.filter(l => l.precio == null).length;
-  $('sinPrecio').textContent = sp ? `${sp} producto(s) sin precio normal: no suman al total.` : '';
-}
-function nuevoPedido() {
-  if (!pedido.length && !hayCliente()) return;
-  if (!confirm('¿Limpiar el pedido de la pantalla? El inventario ya quedó registrado.')) return;
-  pedido = []; limpiarCliente(); pintarPedido();
-  if (!$('codigo').disabled) $('codigo').focus();
-}
-
-// ---------- COMPROBANTE ----------
-const CSS_RECIBO = `.recibo{max-width:320px;margin:0 auto;padding:12px;border:1px dashed #888;background:#fff;color:#000;font:12px/1.35 "Courier New",monospace}
-.recibo .cen{text-align:center}.recibo .neg{font-size:1.25em;font-weight:bold}
-.recibo hr{border:0;border-top:1px dashed #000;margin:6px 0}
-.recibo table{width:100%;border-collapse:collapse}
-.recibo th,.recibo td{padding:2px 1px;border:0;vertical-align:top;font-size:inherit;text-align:left}
-.recibo th{border-bottom:1px dashed #000}.recibo .d{text-align:right;white-space:nowrap}
-.recibo .tot{display:flex;justify-content:space-between;font-weight:bold;font-size:1.25em}`;
-document.head.appendChild(Object.assign(document.createElement('style'), { textContent: CSS_RECIBO }));
-
-const p2 = n => String(n).padStart(2, '0');
-const fechaTxt = d => `${p2(d.getDate())}/${p2(d.getMonth() + 1)}/${d.getFullYear()} ${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}`;
-const fechaNum = d => `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}`;
-
-function htmlRecibo(c) {
-  const filas = c.lineas.map(l =>
-    `<tr><td>${l.cant}</td><td>${esc(l.nombre)}</td><td class="d">${l.precio == null ? '-' : fmt(l.precio)}</td><td class="d">${fmt(l.sub)}</td></tr>`).join('');
-  return `<div class="cen"><div class="neg">Distribuidora Camila</div><b>${c.titulo}</b></div><hr>
-<div>N.º: ${esc(c.numero)}</div><div>Fecha: ${fechaTxt(c.fecha)}</div><div>Cliente: ${esc(c.cliente)}</div>${c.doc ? `<div>CI/RUC: ${esc(c.doc)}</div>` : ''}${c.tel ? `<div>Tel.: ${esc(c.tel)}</div>` : ''}${c.correo ? `<div>Correo: ${esc(c.correo)}</div>` : ''}<div>Atendió: ${esc(c.usuario)}</div><hr>
-<table><thead><tr><th>Cant.</th><th>Descripción</th><th class="d">P.U.</th><th class="d">Subt.</th></tr></thead><tbody>${filas}</tbody></table><hr>
-<div class="tot"><span>TOTAL</span><span>${fmt(c.total)}</span></div>
-<div>Unidades: ${c.unidades}</div>
-${c.sinPrecio ? `<div>* ${c.sinPrecio} producto(s) sin precio no suman al total.</div>` : ''}
-${c.venta ? '<hr><div class="cen">¡Gracias por su compra!</div>' : ''}`;
-}
-function verComprobante() {
-  if (!delta) return alert('Primero elige un modo y escanea productos.');
-  if (pedido.some(i => i.estado === 'pendiente')) return alert('Espera a que termine de guardarse el último escaneo.');
-  const ls = lineas();
-  if (!ls.length) return alert('No hay productos en el pedido.');
-  const ahora = new Date();
-  compActual = {
-    numero: 'C-' + fechaNum(ahora), fecha: ahora, venta: delta < 0,
-    titulo: delta < 0 ? 'COMPROBANTE DE VENTA' : 'COMPROBANTE DE ENTRADA',
-    usuario: usuarioEmail,
-    lineas: ls, unidades: ls.reduce((a, l) => a + l.cant, 0),
-    total: Math.round(ls.reduce((a, l) => a + l.sub, 0) * 100) / 100,
-    sinPrecio: ls.filter(l => l.precio == null).length
-  };
-  actualizarComp();   // aplica los datos del cliente y dibuja el comprobante
-  $('modalComp').classList.remove('oculto');
-}
-const DATOS_CLIENTE = ['cliNom', 'cliDoc', 'cliTel', 'cliMail'];
-function limpiarCliente() { $('cfinal').checked = false; DATOS_CLIENTE.forEach(i => $(i).value = ''); $('cliNom').disabled = false; }
-function hayCliente() { return $('cfinal').checked || DATOS_CLIENTE.some(i => $(i).value.trim()); }
-function actualizarComp() {
-  if (!compActual) return;
-  const final = $('cfinal').checked;
-  $('cliNom').disabled = final;
-  compActual.cliente = final ? 'Consumidor final' : ($('cliNom').value.trim() || 'Consumidor final');
-  compActual.doc = $('cliDoc').value.trim();
-  compActual.tel = $('cliTel').value.trim();
-  compActual.correo = $('cliMail').value.trim();
-  $('compVista').innerHTML = htmlRecibo(compActual);
-}
-function compValido() {
-  if (compActual.correo && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(compActual.correo)) {
-    alert('El correo del cliente no es válido.'); $('cliMail').focus(); return false;
-  }
-  return true;
-}
-function cerrarComp() { $('modalComp').classList.add('oculto'); if (!$('codigo').disabled) $('codigo').focus(); }
-
-function imprimirComprobante() {
-  if (!compActual || !compValido()) return;
-  const css = CSS_RECIBO + `@page{size:80mm auto;margin:4mm}body{margin:0}.recibo{max-width:none;width:72mm;border:0;padding:0;font-size:9pt}`;
-  const w = window.open('', '_blank'); if (!w) return alert('Permite las ventanas emergentes.');
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(compActual.numero)}</title><style>${css}</style></head><body><div class="recibo">${htmlRecibo(compActual)}</div></body></html>`);
-  w.document.close(); w.focus(); setTimeout(() => w.print(), 400);
-}
-// Dibuja el comprobante en un PDF de 80 mm de ancho (tipo ticket); devuelve la altura usada
-function dibujarPDF(doc, c) {
-  const W = 80, M = 4, X_DESC = 13, X_PU = 60, X_SUB = W - M, ANCHO_DESC = 33;
-  let y = 8;
-  const centro = (t, s) => { doc.setFontSize(s); doc.text(t, W / 2, y, { align: 'center' }); };
-  const par = t => doc.splitTextToSize(t, W - 2 * M).forEach(l => { doc.text(l, M, y); y += 3.6; });
-  const raya = () => { doc.setLineWidth(.2); doc.line(M, y, W - M, y); y += 3.8; };
-  doc.setFont('helvetica', 'bold'); centro('Distribuidora Camila', 12); y += 5;
-  centro(c.titulo, 9); y += 4.5;
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
-  raya();
-  par('No.: ' + c.numero); par('Fecha: ' + fechaTxt(c.fecha)); par('Cliente: ' + c.cliente); if (c.doc) par('CI/RUC: ' + c.doc); if (c.tel) par('Tel.: ' + c.tel); if (c.correo) par('Correo: ' + c.correo); par('Atendió: ' + c.usuario);
-  raya();
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(7.5);
-  doc.text('Cant.', M, y); doc.text('Descripción', X_DESC, y); doc.text('P.U.', X_PU, y, { align: 'right' }); doc.text('Subt.', X_SUB, y, { align: 'right' });
-  y += 1.8; raya();
-  doc.setFont('helvetica', 'normal');
-  c.lineas.forEach(l => {
-    const partes = doc.splitTextToSize(l.nombre, ANCHO_DESC);
-    doc.text(String(l.cant), M, y);
-    partes.forEach((t, k) => doc.text(t, X_DESC, y + k * 3.3));
-    doc.text(l.precio == null ? '-' : fmt(l.precio), X_PU, y, { align: 'right' });
-    doc.text(fmt(l.sub), X_SUB, y, { align: 'right' });
-    y += partes.length * 3.3 + 1.2;
-  });
-  raya(); y += .8;
-  doc.setFont('helvetica', 'bold'); doc.setFontSize(11);
-  doc.text('TOTAL', M, y); doc.text(fmt(c.total), X_SUB, y, { align: 'right' }); y += 5;
-  doc.setFont('helvetica', 'normal'); doc.setFontSize(8);
-  doc.text('Unidades: ' + c.unidades, M, y); y += 4;
-  if (c.sinPrecio) par(`* ${c.sinPrecio} producto(s) sin precio no suman al total.`);
-  if (c.venta) { y += 3; doc.setFont('helvetica', 'bold'); centro('Gracias por su compra', 9); y += 4; }
-  return y;
-}
-function pdfComprobante() {
-  if (!compActual || !compValido()) return;
-  if (!window.jspdf) return alert('No se pudo cargar la librería de PDF. Revisa tu conexión a internet.');
-  const { jsPDF } = window.jspdf;
-  const nuevo = h => new jsPDF({ unit: 'mm', format: [80, h], orientation: 'portrait' });
-  const alto = dibujarPDF(nuevo(3000), compActual);          // primera pasada: medir
-  const doc = nuevo(Math.max(alto + 6, 60));                  // segunda: página a la medida
-  dibujarPDF(doc, compActual);
-  doc.save('comprobante-' + compActual.numero + '.pdf');
-}
-
-// ---------- ETIQUETAS 32x25 mm ----------
-function visibles() { const q = $('buscar').value.toLowerCase().trim(); return catalogo.filter(p => !q || (p.nombre || '').toLowerCase().includes(q) || p.codigo.includes(q)); }
-function pintarCat() {
-  $('cuerpo').innerHTML = visibles().slice(0, 300).map(p =>
-    `<tr><td>${esc(p.codigo)}</td><td>${esc(p.nombre)}</td><td><input type="number" min="0" data-c="${esc(p.codigo)}" value="${cant[p.codigo] || 0}"></td></tr>`).join('');
-}
-$('cuerpo').addEventListener('input', e => { const c = e.target.dataset && e.target.dataset.c; if (c !== undefined) cant[c] = parseInt(e.target.value) || 0; });
-function llenar(n) { visibles().slice(0, 300).forEach(p => cant[p.codigo] = n); pintarCat(); }
-function svgCodigo(c) {
-  const s = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-  JsBarcode(s, c, { format: $('formato').value, width: 2, height: 50, margin: 0, displayValue: false });
-  s.setAttribute('viewBox', `0 0 ${parseFloat(s.getAttribute('width'))} ${parseFloat(s.getAttribute('height'))}`);
-  s.setAttribute('preserveAspectRatio', 'none'); s.removeAttribute('width'); s.removeAttribute('height');
-  return s.outerHTML;
-}
-function imprimir() {
-  const sel = catalogo.filter(p => (cant[p.codigo] || 0) > 0);
-  if (!sel.length) return alert('Pon una cantidad mayor a 0.');
-  let html = '', total = 0; const malos = [];
-  sel.forEach(p => {
-    let svg; try { svg = svgCodigo(p.codigo); } catch (e) { malos.push(p.codigo); return; }
-    for (let i = 0; i < cant[p.codigo]; i++, total++)
-      html += `<div class="et"><div class="tit">Distribuidora Camila</div><div class="bc">${svg}</div><div class="num">${esc(p.codigo)}</div><div class="nom">${esc(p.nombre)}</div></div>`;
-  });
-  if (malos.length) alert('Códigos inválidos para el formato elegido (omitidos):\n' + malos.join('\n'));
-  if (!total) return;
-  const dx = parseFloat($('dx').value) || 0, dy = parseFloat($('dy').value) || 0, an = parseFloat($('ancho').value) || 29;
-  const css = `@page{size:32mm 25mm;margin:0}html,body{margin:0}
-.et{position:relative;width:32mm;height:25mm;overflow:hidden;transform:translate(${dx}mm,${dy}mm);font-family:Arial,sans-serif;break-after:page}
-.et:last-child{break-after:auto}.tit{position:absolute;top:1mm;left:0;right:0;font-size:7pt;font-weight:bold;line-height:1;text-align:center}
-.bc{position:absolute;top:7.15mm;left:0;right:0;height:10.7mm}.bc svg{display:block;margin:0 auto;width:${an}mm;height:10.7mm}
-.num{position:absolute;top:17.9mm;left:0;right:0;font-size:6.9pt;line-height:1;text-align:center}
-.nom{position:absolute;top:20.35mm;left:1.2mm;right:1.2mm;font-size:6.9pt;line-height:.95;text-align:center;max-height:4.65mm;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}`;
-  const w = window.open('', '_blank'); if (!w) return alert('Permite las ventanas emergentes.');
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Etiquetas</title><style>${css}</style></head><body>${html}</body></html>`);
-  w.document.close(); w.focus(); setTimeout(() => w.print(), 400);
-  cant = {}; pintarCat();
-}
-
-// ---------- ADMIN ----------
-async function cargarAdmin() {
-  try {
-    // Los no admin piden solo las columnas que necesitan
-    prods = await traerTodos(esAdmin ? '*' : 'id,codigo,nombre,cantidad,precio_normal,precio_en_vivo,precio_mayorista');
-  } catch (e) { return alert(e.message); }
-  prods.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es'));
-  pintarAdm();
-}
-const prVer = v => v == null || v === '' ? '—' : fmt(v);
-function admFiltrados() {
-  const q = $('admBuscar').value.toLowerCase().trim();
-  return prods.filter(p => !q || (p.nombre || '').toLowerCase().includes(q) || p.codigo.includes(q));
-}
-function imprimirInventario() {
-  const lista = admFiltrados();
-  if (!lista.length) return alert('No hay productos para imprimir (¿ya cargó el inventario?).');
-  const q = $('admBuscar').value.trim();
-  const unid = lista.reduce((a, p) => a + (Number(p.cantidad) || 0), 0);
-  const filas = lista.map(p => `<tr><td>${esc(p.codigo)}</td><td>${esc(p.nombre)}</td><td class="d">${p.cantidad}</td><td class="d">${prVer(p.precio_normal)}</td><td class="d">${prVer(p.precio_en_vivo)}</td><td class="d">${prVer(p.precio_mayorista)}</td></tr>`).join('');
-  const css = `@page{size:A4;margin:12mm}body{font:11pt Arial,sans-serif;color:#000;margin:0}
-h1{font-size:16pt;margin:0}.meta{font-size:9pt;color:#333;margin:2mm 0 4mm}
-table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #bbb;padding:1.6mm 1.5mm;text-align:left;font-size:9.5pt}
-th{border-bottom:2px solid #000}thead{display:table-header-group}tr{break-inside:avoid}.d{text-align:right}
-tfoot td{border-top:2px solid #000;border-bottom:0;font-weight:bold}`;
-  const w = window.open('', '_blank'); if (!w) return alert('Permite las ventanas emergentes.');
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Inventario</title><style>${css}</style></head><body>
-<h1>Inventario · Distribuidora Camila</h1>
-<div class="meta">Fecha: ${fechaTxt(new Date())} · Usuario: ${esc(usuarioEmail)}${q ? ' · Filtro: «' + esc(q) + '»' : ''}</div>
-<table><thead><tr><th>Código</th><th>Nombre</th><th class="d">Stock</th><th class="d">Normal</th><th class="d">TikTok</th><th class="d">Mayorista</th></tr></thead><tbody>${filas}</tbody>
-<tfoot><tr><td colspan="2">${lista.length} producto(s)</td><td class="d">${unid}</td><td colspan="3"></td></tr></tfoot></table></body></html>`);
-  w.document.close(); w.focus(); setTimeout(() => w.print(), 400);
-}
-function pintarAdm() {
-  const todos = admFiltrados(), lista = todos.slice(0, 300);
-  $('admCount').textContent = `Mostrando ${lista.length} de ${todos.length} producto(s)` + (todos.length > 300 ? ' · usa el buscador para acotar; al imprimir salen todos' : '');
-  const et = p => `<td><button data-et="${esc(p.codigo)}" title="Imprimir etiqueta">🏷</button></td>`;
-  if (!esAdmin) {   // solo lectura
-    $('admHead').innerHTML = '<tr><th>Código</th><th>Nombre</th><th>Stock</th><th>Normal</th><th>TikTok</th><th>Mayorista</th><th>Etiq.</th></tr>';
-    $('admCuerpo').innerHTML = lista.map(p =>
-      `<tr><td>${esc(p.codigo)}</td><td>${esc(p.nombre)}</td><td><b style="${p.cantidad < 0 ? 'color:#9b2226' : ''}">${p.cantidad}</b></td>
-       <td>${prVer(p.precio_normal)}</td><td>${prVer(p.precio_en_vivo)}</td><td>${prVer(p.precio_mayorista)}</td>${et(p)}</tr>`).join('');
-    return;
-  }
-  $('admHead').innerHTML = '<tr><th>Código</th><th>Nombre</th><th>Stock</th><th>Normal</th><th>TikTok</th><th>Mayorista</th><th>Etiq.</th></tr>';
-  const num = (id, c, v) => `<td><input type="number" step="0.01" value="${v ?? ''}" onchange="guardarCampo(${id},'${c}',this.value)" style="width:70px"></td>`;
-  $('admCuerpo').innerHTML = lista.map(p =>
-    `<tr><td>${esc(p.codigo)}</td><td><input value="${esc(p.nombre)}" onchange="guardarCampo(${p.id},'nombre',this.value)" style="width:170px"></td>
-     <td><input type="number" value="${p.cantidad}" onchange="ajustarStock(${p.id},this.value)" style="width:70px;${p.cantidad < 0 ? 'color:#9b2226' : ''}"></td>
-     ${num(p.id, 'precio_normal', p.precio_normal)}${num(p.id, 'precio_en_vivo', p.precio_en_vivo)}${num(p.id, 'precio_mayorista', p.precio_mayorista)}${et(p)}</tr>`).join('');
-}
-// Desde el inventario: manda el producto a Etiquetas con cantidad 1
-$('admCuerpo').addEventListener('click', e => {
-  const c = e.target.dataset && e.target.dataset.et;
-  if (c === undefined) return;
-  cant[c] = 1; vista('etq'); $('buscar').value = c; pintarCat();
-});
-async function guardarCampo(id, campo, v) {
-  if (!esAdmin) return;
-  const p = prods.find(x => x.id === id);
-  const val = campo === 'nombre' ? v.trim() : (v === '' ? null : parseFloat(v));
-  if (campo === 'nombre' && !val) { alert('El nombre no puede quedar vacío.'); return pintarAdm(); }
-  const { error } = await db.from('productos').update({ [campo]: val }).eq('id', id);
-  if (error) { alert(error.message); return pintarAdm(); }
-  p[campo] = val;
-  const c = indice.get(p.codigo); if (c) c[campo] = val;   // mantiene el catálogo del escáner al día
-}
-// El stock se ajusta como un movimiento, así queda registro en el historial
-async function ajustarStock(id, v) {
-  if (!esAdmin) return;
-  const p = prods.find(x => x.id === id), d = (parseInt(v) || 0) - p.cantidad;
-  if (!d) return;
-  if (!confirm(`Ajustar "${p.nombre}": ${p.cantidad} → ${p.cantidad + d}?`)) return pintarAdm();
-  const { data, error } = await db.rpc('registrar_movimiento', { p_codigo: p.codigo, p_cantidad: d });
-  if (error) alert(error.message); else p.cantidad = data.total;
-  pintarAdm();
-}
-async function reporte() {
-  let q = db.from('movimientos').select('created_at,nombre,cantidad,tipo,usuario').order('created_at', { ascending: false }).limit(1000);
-  if ($('desde').value) q = q.gte('created_at', new Date($('desde').value + 'T00:00:00').toISOString());
-  if ($('hasta').value) q = q.lte('created_at', new Date($('hasta').value + 'T23:59:59').toISOString());
-  if ($('fTipo').value) q = q.eq('tipo', $('fTipo').value);
-  if ($('fUsuario').value.trim()) q = q.ilike('usuario', '%' + $('fUsuario').value.trim() + '%');
-  const { data, error } = await q;
-  if (error) return alert(error.message);
-  const ent = data.filter(m => m.cantidad > 0).reduce((a, m) => a + m.cantidad, 0);
-  const sal = data.filter(m => m.cantidad < 0).reduce((a, m) => a - m.cantidad, 0);
-  $('repResumen').textContent = `Entradas: ${ent} · Descargos: ${sal}` + (data.length === 1000 ? ' (mostrando los 1000 más recientes)' : '');
-  $('repCuerpo').innerHTML = data.map(m => `<tr class="${m.cantidad < 0 ? 's' : 'e'}"><td>${new Date(m.created_at).toLocaleString()}</td><td>${esc(m.nombre || '')}</td><td>${esc(m.usuario || '')}</td><td><b>${m.cantidad > 0 ? '+' : ''}${m.cantidad}</b></td></tr>`).join('');
-}
-
-// ---------- CREAR CÓDIGOS (solo admin) ----------
-// "0012" y "12" se consideran el mismo código para no crear confusiones
-const norm = c => /^\d+$/.test(c) ? c.replace(/^0+(?=\d)/, '') : c;
-let codigosUsados = new Set(), creados = [];
-
-async function refrescarCodigos() {
-  const data = await traerTodos('codigo');
-  codigosUsados = new Set(data.map(p => norm(String(p.codigo))));
-}
-async function abrirCodigos() {
-  $('cMsg').className = ''; $('cMsg').textContent = 'Cargando códigos existentes…';
-  try { await refrescarCodigos(); } catch (e) { $('cMsg').className = 's'; $('cMsg').textContent = 'No se pudieron leer los códigos: ' + e.message; return; }
-  $('cMsg').textContent = ''; sugerir(); $('cNombre').focus();
-}
-// Sugiere códigos de 1 a 5 dígitos que no existen: el siguiente al mayor, el primer hueco libre y algunos al azar
-function sugerir() {
-  const libres = [];
-  const add = n => { const s = String(n); if (n >= 1 && n <= 99999 && !codigosUsados.has(s) && !libres.includes(s)) libres.push(s); };
-  let max = 0; codigosUsados.forEach(c => { if (/^\d{1,5}$/.test(c)) max = Math.max(max, +c); });
-  add(max + 1);
-  for (let n = 1; libres.length < 2 && n <= 99999; n++) add(n);
-  for (let i = 0; libres.length < 6 && i < 2000; i++) add(1 + Math.floor(Math.random() * 99999));
-  $('sugeridos').innerHTML = libres.map(c => `<button class="chip" data-c="${c}">${c}</button>`).join('');
-  $('cCodigo').value = libres[0] || ''; validarCodigo();
-}
-$('sugeridos').addEventListener('click', e => {
-  const c = e.target.dataset && e.target.dataset.c;
-  if (c) { $('cCodigo').value = c; validarCodigo(); }
-});
-function validarCodigo() {
-  const c = $('cCodigo').value, m = $('cMsg');
-  if (!c) { m.className = ''; m.textContent = ''; }
-  else if (!/^\d{1,5}$/.test(c)) { m.className = 's'; m.textContent = '✗ Solo números, de 1 a 5 dígitos.'; }
-  else if (codigosUsados.has(norm(c))) { m.className = 's'; m.textContent = '✗ Ese código ya existe.'; }
-  else { m.className = 'e'; m.textContent = '✓ Código disponible.'; }
-}
-async function crearCodigo() {
-  const nombre = $('cNombre').value.trim().replace(/\s+/g, ' ');
-  const codigo = $('cCodigo').value.trim();
-  const precios = { precio_normal: $('cPrecio').value, precio_en_vivo: $('cTikTok').value, precio_mayorista: $('cMayor').value };
-  const msg = t => { $('cMsg').className = 's'; $('cMsg').textContent = t; };
-  if (!nombreValido(nombre)) { msg('Escribe el nombre del producto nuevo (con letras).'); $('cNombre').focus(); return; }
-  if (!/^\d{1,5}$/.test(codigo)) return msg('El código debe tener solo números, de 1 a 5 dígitos.');
-  if (Object.values(precios).some(v => v !== '' && !(parseFloat(v) >= 0))) return msg('Algún precio no es válido.');
-  $('cBtn').disabled = true;
-  try {
-    await refrescarCodigos();            // por si otro usuario creó códigos mientras tanto
-    if (codigosUsados.has(norm(codigo))) { sugerir(); return msg('Ese código ya existe; te sugerí otros.'); }
-    const fila = { codigo, nombre };
-    Object.entries(precios).forEach(([k, v]) => { if (v !== '') fila[k] = parseFloat(v); });
-    const { error } = await db.from('productos').insert(fila);
-    if (error) {
-      if (error.code === '23505') { await refrescarCodigos(); sugerir(); return msg('Ese código ya existe; te sugerí otros.'); }
-      return msg(error.message);
-    }
-    codigosUsados.add(norm(codigo));
-    creados.unshift({ codigo, nombre });
-    $('creados').innerHTML = creados.map(c => `<li><span>${esc(c.nombre)}</span><b>${esc(c.codigo)}</b></li>`).join('');
-    $('cNombre').value = ''; $('cPrecio').value = ''; $('cTikTok').value = ''; $('cMayor').value = '';
-    sugerir();
-    $('cMsg').className = 'e'; $('cMsg').textContent = `✓ Creado: ${codigo} · ${nombre}`;
-    $('cNombre').focus();
-    cargarCatalogo();
-  } finally { $('cBtn').disabled = false; }
-}
-$('cNombre').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('cCodigo').focus(); } });
-$('cCodigo').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); crearCodigo(); } });
-
-db.auth.onAuthStateChange((ev, s) => { if (ev === 'PASSWORD_RECOVERY') modoClave = true; setTimeout(() => mostrar(s), 0); });
-if (errorEnlace) $('errLogin').textContent = errorEnlace;
-iniciar();
-</script></body></html>
+<script src="js/app-core.js"></script>
+<script src="js/scanner.js"></script>
+<script src="js/comprobante.js"></script>
+<script src="js/etiquetas.js"></script>
+<script src="js/inventario.js"></script>
+<script src="js/ventas-caja.js"></script>
+<script src="js/codigos.js"></script>
+<script src="js/app-init.js"></script></body></html>
