@@ -30,7 +30,17 @@ td input{width:60px}.lista{max-height:420px;overflow:auto}
 <div id="login" class="card oculto">
   <h2>Inventario Camila</h2>
   <div class="row"><input id="email" type="email" list="correos" placeholder="Correo" autocomplete="off"><datalist id="correos"></datalist><input id="pass" type="password" placeholder="Contraseña" autocomplete="off">
-  <button onclick="entrar()">Entrar</button></div><p id="errLogin" class="s"></p>
+  <button onclick="entrar()">Entrar</button></div><p id="errLogin" class="s"></p><p id="okLogin" class="e"></p>
+  <p style="margin:0"><a href="#" onclick="olvide();return false">¿Olvidaste tu contraseña?</a></p>
+</div>
+
+<div id="clave" class="card oculto">
+  <h2>Crea tu contraseña</h2>
+  <p>Escribe la contraseña con la que vas a entrar al inventario (mínimo 8 caracteres).</p>
+  <div class="row"><input id="clave1" type="password" placeholder="Nueva contraseña" autocomplete="new-password" style="flex:1">
+  <input id="clave2" type="password" placeholder="Repite la contraseña" autocomplete="new-password" style="flex:1">
+  <button class="v" onclick="guardarClave()">Guardar contraseña</button></div>
+  <p id="errClave" class="s"></p>
 </div>
 
 <div id="app" class="oculto">
@@ -142,6 +152,11 @@ td input{width:60px}.lista{max-height:420px;overflow:auto}
 const SUPABASE_URL = 'https://zfeazyxionredunjqxdx.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_W1HNg5ZTFEEi3SegFC5r0A_RzFSOZiO';   // clave pública (publishable); la seguridad la da RLS
 // ================================================================
+// Enlace del correo (invitación / recuperar contraseña): Supabase lo manda con datos en el # de la dirección
+const hashParams = new URLSearchParams(location.hash.slice(1));
+let modoClave = ['invite', 'recovery', 'signup'].includes(hashParams.get('type'));
+const errorEnlace = hashParams.get('error') ? 'El enlace del correo expiró o ya fue usado. Pulsa «¿Olvidaste tu contraseña?» para recibir uno nuevo.' : '';
+if (errorEnlace) history.replaceState(null, '', location.pathname + location.search);
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 const $ = id => document.getElementById(id);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
@@ -170,9 +185,12 @@ function reiniciarUI() {
   pintarPedido();
 }
 function mostrar(session) {
+  const pideClave = !!session && modoClave;     // llegó por enlace del correo: primero debe crear su contraseña
   $('login').classList.toggle('oculto', !!session);
-  $('app').classList.toggle('oculto', !session);
+  $('clave').classList.toggle('oculto', !pideClave);
+  $('app').classList.toggle('oculto', !session || pideClave);
   if (!session) { if (uidActual) reiniciarUI(); uidActual = null; cargarCorreos(); return; }
+  if (pideClave) { setTimeout(() => $('clave1').focus(), 50); return; }
   $('quien').textContent = usuarioEmail = session.user.email;
   // Solo se reinicia la pantalla cuando entra OTRO usuario (no en cada refresco de token)
   if (session.user.id !== uidActual) {
@@ -196,12 +214,38 @@ function cargarCorreos() {
 async function entrar() {
   const correo = $('email').value.trim();
   const { error } = await db.auth.signInWithPassword({ email: correo, password: $('pass').value });
-  if (error) { $('errLogin').textContent = 'Correo o contraseña incorrectos.'; return; }
-  guardarCorreo(correo); $('pass').value = ''; $('errLogin').textContent = ''; iniciar();
+  if (error) {
+    $('okLogin').textContent = '';
+    $('errLogin').textContent = /not confirmed/i.test(error.message)
+      ? 'Tu correo aún no está confirmado. Pide al administrador que lo confirme.' : 'Correo o contraseña incorrectos.';
+    return;
+  }
+  modoClave = false;
+  guardarCorreo(correo); $('pass').value = ''; $('errLogin').textContent = ''; $('okLogin').textContent = ''; iniciar();
 }
 $('pass').addEventListener('keydown', e => { if (e.key === 'Enter') entrar(); });
 cargarCorreos();
 async function salir() { await db.auth.signOut(); iniciar(); }
+async function olvide() {
+  const c = $('email').value.trim();
+  $('okLogin').textContent = '';
+  if (!c) { $('errLogin').textContent = 'Escribe tu correo arriba y vuelve a pulsar «¿Olvidaste tu contraseña?».'; return; }
+  const { error } = await db.auth.resetPasswordForEmail(c, { redirectTo: location.origin + location.pathname });
+  if (error) { $('errLogin').textContent = /seconds|rate/i.test(error.message) ? 'Espera un minuto antes de pedir otro enlace.' : error.message; return; }
+  $('errLogin').textContent = '';
+  $('okLogin').textContent = 'Si el correo está registrado, te enviamos un enlace para crear una contraseña nueva. Revisa también la carpeta de spam.';
+}
+async function guardarClave() {
+  const a = $('clave1').value, b = $('clave2').value, err = t => { $('errClave').textContent = t; };
+  if (a.length < 8) return err('La contraseña debe tener al menos 8 caracteres.');
+  if (a !== b) return err('Las contraseñas no coinciden.');
+  const { error } = await db.auth.updateUser({ password: a });
+  if (error) return err(error.message);
+  modoClave = false; err(''); $('clave1').value = $('clave2').value = '';
+  history.replaceState(null, '', location.pathname + location.search);
+  iniciar();
+}
+$('clave2').addEventListener('keydown', e => { if (e.key === 'Enter') guardarClave(); });
 
 function vista(v) {
   if (v === 'cod' && !esAdmin) v = 'inicio';   // crear códigos: solo admin
@@ -641,6 +685,7 @@ async function crearCodigo() {
 $('cNombre').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); $('cCodigo').focus(); } });
 $('cCodigo').addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); crearCodigo(); } });
 
-db.auth.onAuthStateChange((_e, s) => setTimeout(() => mostrar(s), 0));
+db.auth.onAuthStateChange((ev, s) => { if (ev === 'PASSWORD_RECOVERY') modoClave = true; setTimeout(() => mostrar(s), 0); });
+if (errorEnlace) $('errLogin').textContent = errorEnlace;
 iniciar();
 </script></body></html>
