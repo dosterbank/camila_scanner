@@ -10,6 +10,7 @@ function modo(d) {
   document.body.className = d > 0 ? 'entrada' : 'salida';
   $('modoTxt').textContent = d > 0 ? 'Entradas' : 'Descargos';
   $('codigo').disabled = false; $('codigo').focus();
+  mostrarStockComboPedido();
 }
 $('codigo').addEventListener('keydown', e => {
   if (e.key !== 'Enter') return;
@@ -30,7 +31,7 @@ document.addEventListener('keydown', e => {
 });
 
 function encolar(codigo) {
-  const item = { codigo, nombre: 'Registrando…', cantidad: delta, estado: 'pendiente' };
+  const item = { id: `producto-${Date.now()}-${Math.random().toString(36).slice(2)}`, codigo, nombre: 'Registrando…', cantidad: delta, estado: 'pendiente' };
   pedido.push(item); pintarPedido();
   // cola: un escaneo a la vez, en orden (el servidor además lo hace atómico)
   cola = cola.then(async () => {
@@ -42,6 +43,8 @@ function encolar(codigo) {
     else {
       item.nombre = data.nombre;
       $('exist').textContent = data.nombre + ': ' + data.total;
+      const producto = indice.get(codigo);
+      if (producto && data.total != null) producto.cantidad = Number(data.total);
       if (data.sinNombre || sinNombre(data.nombre)) {
         item.nombre = 'Sin nombre';
         pedirNombre(data.codigo || codigo, false);   // ya quedó registrado; solo falta el nombre
@@ -49,6 +52,7 @@ function encolar(codigo) {
       item.estado = 'ok';
     }
     pintarPedido();
+    mostrarStockComboPedido();
   });
 }
 function pedirNombre(codigo, registrarDespues) {
@@ -91,16 +95,29 @@ function beep() { try { const c = new AudioContext(), o = c.createOscillator(); 
 function lineas() {
   const m = new Map();
   pedido.forEach(i => {
-    if (i.estado === 'error') return;
-    const l = m.get(i.codigo) || { codigo: i.codigo, nombre: i.nombre, cant: 0, pendiente: false };
-    m.delete(i.codigo);                                  // el último escaneado queda al final
-    const p = indice.get(i.codigo);
-    l.nombre = p && !sinNombre(p.nombre) ? p.nombre : i.nombre;
+    if (i.estado === 'error' || i.estado === 'error_parcial') return;
+    const clave = i.tipo === 'combo' ? `combo:${i.comboId}` : `producto:${i.codigo}`;
+    const l = m.get(clave) || (i.tipo === 'combo'
+      ? {
+          codigo: `COMBO-${i.comboId}`, comboId: i.comboId, combo: true, nombre: i.nombre,
+          cant: 0, unidades: 0, precio: i.precio, componentes: i.componentes, pendiente: false
+        }
+      : { codigo: i.codigo, nombre: i.nombre, cant: 0, unidades: 0, pendiente: false });
+    m.delete(clave);
+    const p = i.tipo === 'combo' ? null : indice.get(i.codigo);
+    l.nombre = i.tipo === 'combo' ? i.nombre : p && !sinNombre(p.nombre) ? p.nombre : i.nombre;
     l.cant += Math.abs(i.cantidad);
+    l.unidades += i.tipo === 'combo'
+      ? Math.abs(i.cantidad) * i.componentes.reduce((suma, componente) => suma + componente.cantidad, 0)
+      : Math.abs(i.cantidad);
     l.pendiente = l.pendiente || i.estado === 'pendiente';
-    m.set(i.codigo, l);
+    l.pendiente = l.pendiente || i.estado === 'quitando';
+    m.set(clave, l);
   });
   return [...m.values()].map(l => {
+    if (l.combo) return {
+      ...l, precioTipo: 'combo_fijo', sub: Math.round(l.precio * l.cant * 100) / 100
+    };
     const precioTipo = precioElegido[l.codigo] || 'precio_en_vivo';
     const precio = precioDe(l.codigo);
     return { ...l, precioTipo, precio, sub: precio == null ? 0 : Math.round(precio * l.cant * 100) / 100 };
@@ -119,24 +136,25 @@ $('lista').addEventListener('click', e => {
 function pintarPedido() {
   const ls = lineas(), cls = delta < 0 ? 's' : 'e';
   $('lista').innerHTML = ls.slice().reverse().map(l =>
-    `<tr class="${cls}"><td>${esc(l.nombre)}<br><small>${esc(l.codigo)}${l.pendiente ? ' · guardando…' : ''}</small></td>
-     <td><b>${l.cant}</b></td><td><div class="precios period-control" role="group" aria-label="Precio de ${esc(l.nombre)}">${[
+    `<tr class="${cls}"><td>${esc(l.nombre)}<br><small>${esc(l.combo ? 'Combo' : l.codigo)}${l.pendiente ? ' · procesando…' : ''}</small></td>
+     <td><b>${l.cant}${l.combo ? ' combo(s)' : ''}</b></td><td>${l.combo ? `<b>Precio fijo · ${fmt(l.precio)}</b>` : `<div class="precios period-control" role="group" aria-label="Precio de ${esc(l.nombre)}">${[
        ['precio_normal', 'Normal'], ['precio_en_vivo', 'TikTok'], ['precio_mayorista', 'Mayorista']
      ].map(([tipo, etiqueta]) => {
        const p = indice.get(l.codigo), valor = p && p[tipo], seleccionado = (precioElegido[l.codigo] || 'precio_en_vivo') === tipo;
        return `<button type="button" class="period-option precio-opcion${seleccionado ? ' activo' : ''}" data-codigo="${esc(l.codigo)}" data-precio="${tipo}" aria-pressed="${seleccionado}" ${valor == null || valor === '' ? 'disabled' : ''}><span>${etiqueta}</span><b>${valor == null || valor === '' ? '—' : fmt(valor)}</b></button>`;
-     }).join('')}</div></td><td>${fmt(l.sub)}</td></tr>`).join('');
-  $('errores').innerHTML = pedido.filter(i => i.estado === 'error').map(i =>
-    `<li class="s"><span>${esc(i.codigo)}: ${esc(i.nombre)}</span></li>`).join('');
-  $('total').textContent = ls.reduce((a, l) => a + l.cant, 0);
+     }).join('')}</div>`}</td><td>${fmt(l.sub)}</td>
+     <td><button type="button" class="r quitar-linea" data-quitar-linea="${esc(l.combo ? `combo:${l.comboId}` : `producto:${l.codigo}`)}" aria-label="Quitar ${esc(l.nombre)} del pedido" ${l.pendiente ? 'disabled' : ''}>×</button></td></tr>`).join('');
+  $('errores').innerHTML = pedido.filter(i => i.estado === 'error' || i.estado === 'error_parcial').map(i =>
+    `<li class="s"><span>${esc(i.tipo === 'combo' ? i.nombre : i.codigo)}: ${esc(i.nombre)}</span>${i.estado === 'error' ? `<button type="button" data-quitar-error="${esc(i.id || '')}" aria-label="Quitar línea con error">×</button>` : '<b>Requiere ajuste de inventario</b>'}</li>`).join('');
+  $('total').textContent = ls.reduce((a, l) => a + l.unidades, 0);
   $('totalDin').textContent = fmt(ls.reduce((a, l) => a + l.sub, 0));
   $('lblTotal').textContent = delta > 0 ? 'Total entrada (precio seleccionado)' : 'Total a pagar';
-  const sp = ls.filter(l => l.precio == null).length;
+  const sp = ls.filter(l => !l.combo && l.precio == null).length;
   $('sinPrecio').textContent = sp ? `${sp} producto(s) sin precio seleccionado: no suman al total.` : '';
 }
 async function nuevoPedido() {
   if (!pedido.length && !hayCliente()) return;
-  if (pedido.some(i => i.estado === 'pendiente')) return alert('Espera a que termine de guardarse el último escaneo.');
+  if (pedido.some(i => ['pendiente', 'quitando', 'error_parcial'].includes(i.estado))) return alert('Resuelve primero la operación de inventario pendiente o incompleta.');
   if (!confirm('¿Cerrar este pedido y empezar uno nuevo? El inventario ya quedó registrado.')) return;
   if (pedido.length) {
     prepararComprobante();

@@ -55,7 +55,7 @@ ${c.venta ? '<hr><div class="cen">¡Gracias por su compra!</div>' : ''}`;
 }
 function verComprobante() {
   if (!delta) return alert('Primero elige un modo y escanea productos.');
-  if (pedido.some(i => i.estado === 'pendiente')) return alert('Espera a que termine de guardarse el último escaneo.');
+  if (pedido.some(i => ['pendiente', 'quitando', 'error_parcial'].includes(i.estado))) return alert('Espera a que termine o se resuelva la operación de inventario.');
   const ls = lineas();
   if (!ls.length) return alert('No hay productos en el pedido.');
   prepararComprobante();
@@ -77,7 +77,7 @@ function prepararComprobante() {
     usuario: usuarioEmail, cliente: 'Consumidor final', doc: '', tel: '', correo: ''
   };
   compActual.lineas = ls;
-  compActual.unidades = ls.reduce((a, l) => a + l.cant, 0);
+  compActual.unidades = ls.reduce((a, l) => a + l.unidades, 0);
   compActual.total = Math.round(ls.reduce((a, l) => a + l.sub, 0) * 100) / 100;
   compActual.sinPrecio = ls.filter(l => l.precio == null).length;
   actualizarComp();
@@ -160,6 +160,9 @@ function programarGuardadoPedido() {
 async function guardarPedido() {
   clearTimeout(timerGuardado);
   if (!compActual) return;
+  if (pedido.some(i => ['pendiente', 'quitando', 'error_parcial'].includes(i.estado))) {
+    throw new Error('Espera a que terminen las operaciones de inventario antes de guardar el comprobante.');
+  }
   const c = compActual;
   const datos = {
     p_numero: c.numero,
@@ -175,7 +178,13 @@ async function guardarPedido() {
   };
   datos.p_lineas = c.lineas.map(l => ({
     codigo: l.codigo, nombre: l.nombre, cantidad: l.cant,
-    precio_unitario: l.precio, subtotal: l.sub, tipo_precio: l.precioTipo
+    precio_unitario: l.precio, subtotal: l.sub, tipo_precio: l.precioTipo,
+    ...(l.combo ? {
+      tipo_linea: 'combo',
+      combo_id: l.comboId,
+      unidades: l.unidades,
+      componentes: l.componentes.map(p => ({ codigo: p.codigo, nombre: p.nombre, cantidad: p.cantidad }))
+    } : {})
   }));
   const ejecutar = async () => {
     const { data, error } = await db.rpc('guardar_pedido', datos);

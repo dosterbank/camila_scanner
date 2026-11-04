@@ -75,6 +75,25 @@ body.loginPage{max-width:none;min-height:100vh;padding:24px;display:grid;place-i
 .period-control{display:inline-flex;gap:4px;padding:4px;border:1px solid #e1d8e5;border-radius:10px;background:#f8f2f9}
 .period-option{min-width:92px;border:0;background:transparent;color:#514357}
 .period-option.activo,.period-option[aria-pressed=true]{background:#8f178e;color:#fff;box-shadow:0 2px 6px rgba(70,0,70,.2)}
+.scanner-combo-layout{display:grid;grid-template-columns:minmax(0,1fr) minmax(280px,360px);gap:10px;align-items:stretch}
+.scanner-box{display:flex;flex-direction:column;justify-content:center;gap:8px;min-width:0}
+.scanner-box #codigo{width:100%;min-width:0}
+.combo-pedido{margin:10px 0;min-width:0}
+.combo-pedido>label{display:block;margin-bottom:8px}
+.combo-pedido p{margin:6px 0}
+.combo-pedido ul{max-height:150px;overflow:auto}
+.combo-pedido li{gap:8px;font-size:13px}
+.combo-productos{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:6px;max-height:260px;overflow:auto}
+.combo-producto{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px;background:#fff;color:#35123e;border:1px solid #e1d8e5;text-align:left}
+.combo-producto:hover{background:#f5eafa}
+.combo-producto small{color:#716679}
+.combo-form{margin-top:12px}
+.combo-form label{display:grid;gap:4px;flex:1;min-width:200px}
+.combo-admin{padding:10px 0;border-bottom:1px solid #e1d8e5}
+.combo-admin h4{margin:0 auto 0 0}
+.combo-admin ul{margin-top:8px}
+.combo-admin li{gap:8px}
+.quitar-linea{padding:4px 10px;font-size:18px}
 .chart-control{display:flex;width:max-content;margin-top:8px}
 .chart-control .period-option{display:flex;align-items:center;justify-content:center;gap:7px}
 .chart-control svg{width:19px;height:19px;fill:currentColor}
@@ -122,6 +141,8 @@ body.loginPage{max-width:none;min-height:100vh;padding:24px;display:grid;place-i
   .pie-summary{grid-column:1;grid-row:2;padding:8px 12px}
   .pie-summary span{font-size:16px}
   .pie-legend{grid-column:1;grid-row:3}
+  .scanner-combo-layout{grid-template-columns:minmax(0,1fr)}
+  .combo-pedido{margin:0 0 10px}
 }
 @media(max-width:420px){
   .app-header{flex-wrap:wrap}

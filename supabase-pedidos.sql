@@ -42,6 +42,21 @@ create table if not exists public.pedidos (
   actualizado_en timestamptz not null default now()
 );
 
+create table if not exists public.combos_caja (
+  id uuid primary key default gen_random_uuid(),
+  nombre text not null check (length(btrim(nombre)) between 2 and 100),
+  precio numeric(12, 2) not null check (precio >= 0),
+  activo boolean not null default true,
+  creado_en timestamptz not null default now(),
+  actualizado_en timestamptz not null default now()
+);
+create table if not exists public.combo_productos (
+  combo_id uuid not null references public.combos_caja(id),
+  codigo text not null,
+  cantidad integer not null check (cantidad > 0),
+  primary key (combo_id, codigo)
+);
+
 alter table public.pedidos add column if not exists tipo text not null default 'venta';
 do $$
 begin
@@ -58,6 +73,8 @@ $$;
 
 alter table public.clientes enable row level security;
 alter table public.pedidos enable row level security;
+alter table public.combos_caja enable row level security;
+alter table public.combo_productos enable row level security;
 
 create table if not exists public.rpc_rate_limits (
   user_id uuid not null,
@@ -118,6 +135,121 @@ $$;
 revoke all on function public.usuario_es_admin() from public, anon;
 grant execute on function public.usuario_es_admin() to authenticated;
 
+create or replace function public.listar_combos()
+returns table (
+  combo_id uuid, nombre text, precio numeric, codigo text, producto text, cantidad integer, stock integer
+)
+language plpgsql
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+begin
+  if auth.uid() is null then
+    raise exception 'Se requiere una sesion iniciada.';
+  end if;
+  return query
+  select c.id, c.nombre, c.precio, cp.codigo, p.nombre, cp.cantidad, p.cantidad
+  from public.combos_caja c
+  join public.combo_productos cp on cp.combo_id = c.id
+  join public.productos p on p.codigo = cp.codigo
+  where c.activo
+  order by c.nombre, cp.codigo;
+end;
+$$;
+
+create or replace function public.guardar_combo(
+  p_id uuid, p_nombre text, p_precio numeric, p_componentes jsonb
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+declare
+  v_id uuid;
+begin
+  if auth.uid() is null or not public.usuario_es_admin() then
+    raise exception 'Solo administradores pueden guardar combos.';
+  end if;
+  if p_nombre is null or length(btrim(p_nombre)) not between 2 and 100
+    or p_precio is null or p_precio < 0 or p_precio > 9999999999.99
+    or p_precio <> round(p_precio, 2)
+    or p_componentes is null or jsonb_typeof(p_componentes) <> 'array'
+    or jsonb_array_length(case when jsonb_typeof(p_componentes) = 'array'
+      then p_componentes else '[]'::jsonb end) not between 1 and 100 then
+    raise exception 'Los datos del combo no son validos.';
+  end if;
+  if exists (
+    select 1 from jsonb_array_elements(p_componentes) as componente(item)
+    where jsonb_typeof(componente.item) <> 'object'
+      or length(coalesce(componente.item ->> 'codigo', '')) not between 1 and 50
+      or coalesce(componente.item ->> 'cantidad', '') !~ '^[1-9][0-9]{0,5}$'
+  ) or (
+    select count(*) <> count(distinct componente.item ->> 'codigo')
+    from jsonb_array_elements(p_componentes) as componente(item)
+  ) then
+    raise exception 'Los productos o cantidades del combo no son validos.';
+  end if;
+  if (
+    select sum((componente.item ->> 'cantidad')::numeric)
+    from jsonb_array_elements(p_componentes) as componente(item)
+  ) > 999999 then
+    raise exception 'La suma de unidades del combo excede el limite permitido.';
+  end if;
+  if exists (
+    select 1 from jsonb_array_elements(p_componentes) as componente(item)
+    left join public.productos p on p.codigo = componente.item ->> 'codigo'
+    where p.id is null
+  ) then
+    raise exception 'Uno o mas productos del combo ya no existen.';
+  end if;
+
+  if p_id is null then
+    insert into public.combos_caja (nombre, precio)
+    values (btrim(p_nombre), p_precio)
+    returning id into v_id;
+  else
+    update public.combos_caja
+    set nombre = btrim(p_nombre), precio = p_precio, actualizado_en = now()
+    where id = p_id and activo
+    returning id into v_id;
+    if v_id is null then
+      raise exception 'El combo no existe o ya fue eliminado.';
+    end if;
+    delete from public.combo_productos where combo_id = v_id;
+  end if;
+  insert into public.combo_productos (combo_id, codigo, cantidad)
+  select v_id, componente.item ->> 'codigo', (componente.item ->> 'cantidad')::integer
+  from jsonb_array_elements(p_componentes) as componente(item);
+  return v_id;
+end;
+$$;
+
+create or replace function public.eliminar_combo(p_id uuid)
+returns void
+language plpgsql
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+begin
+  if auth.uid() is null or not public.usuario_es_admin() then
+    raise exception 'Solo administradores pueden eliminar combos.';
+  end if;
+  update public.combos_caja set activo = false, actualizado_en = now()
+  where id = p_id and activo;
+  if not found then
+    raise exception 'El combo no existe o ya fue eliminado.';
+  end if;
+end;
+$$;
+
+revoke all on function public.listar_combos() from public, anon;
+revoke all on function public.guardar_combo(uuid, text, numeric, jsonb) from public, anon;
+revoke all on function public.eliminar_combo(uuid) from public, anon;
+grant execute on function public.listar_combos() to authenticated;
+grant execute on function public.guardar_combo(uuid, text, numeric, jsonb) to authenticated;
+grant execute on function public.eliminar_combo(uuid) to authenticated;
+
 create policy "Admins can read orders" on public.pedidos
   for select to authenticated using (public.usuario_es_admin());
 
@@ -125,6 +257,7 @@ create policy "Authenticated users can read cash closures" on public.cierres_caj
   for select to authenticated using (auth.uid() is not null);
 
 revoke all on public.clientes, public.pedidos from public, anon, authenticated;
+revoke all on public.combos_caja, public.combo_productos from public, anon, authenticated;
 revoke all on public.cierres_caja from public, anon, authenticated;
 grant select on public.pedidos to authenticated;
 grant select on public.cierres_caja to authenticated;
@@ -292,18 +425,69 @@ begin
       or length(coalesce(linea.item ->> 'codigo', '')) not between 1 and 50
       or length(coalesce(linea.item ->> 'nombre', '')) > 200
       or coalesce(linea.item ->> 'cantidad', '') !~ '^[1-9][0-9]{0,5}$'
-      or coalesce(linea.item ->> 'tipo_precio', '') not in
-        ('precio_normal', 'precio_en_vivo', 'precio_mayorista')
+      or coalesce(linea.item ->> 'tipo_linea', 'producto') not in ('producto', 'combo')
       or (
-        linea.item -> 'precio_unitario' <> 'null'::jsonb
-        and coalesce(linea.item ->> 'precio_unitario', '') !~ '^[0-9]{1,10}([.][0-9]{1,2})?$'
+        coalesce(linea.item ->> 'tipo_linea', 'producto') = 'producto'
+        and (
+          coalesce(linea.item ->> 'tipo_precio', '') not in
+            ('precio_normal', 'precio_en_vivo', 'precio_mayorista')
+          or (
+            linea.item -> 'precio_unitario' <> 'null'::jsonb
+            and coalesce(linea.item ->> 'precio_unitario', '') !~ '^[0-9]{1,10}([.][0-9]{1,2})?$'
+          )
+        )
+      )
+      or (
+        linea.item ->> 'tipo_linea' = 'combo'
+        and (
+          coalesce(linea.item ->> 'combo_id', '') !~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+          or coalesce(linea.item ->> 'codigo', '') <> 'COMBO-' || coalesce(linea.item ->> 'combo_id', '')
+          or coalesce(linea.item ->> 'tipo_precio', '') <> 'combo_fijo'
+          or coalesce(linea.item ->> 'unidades', '') !~ '^[1-9][0-9]{0,6}$'
+          or jsonb_typeof(linea.item -> 'componentes') <> 'array'
+          or jsonb_array_length(case when jsonb_typeof(linea.item -> 'componentes') = 'array'
+            then linea.item -> 'componentes' else '[]'::jsonb end) not between 1 and 100
+          or coalesce(linea.item ->> 'precio_unitario', '') !~ '^[0-9]{1,10}([.][0-9]{1,2})?$'
+        )
       )
       or coalesce(linea.item ->> 'subtotal', '') !~ '^[0-9]{1,12}([.][0-9]{1,2})?$'
   ) then
     raise exception 'Una o mas lineas del pedido no son validas.';
   end if;
+  if exists (
+    select 1
+    from jsonb_array_elements(p_lineas) as linea(item)
+    where linea.item ->> 'tipo_linea' = 'combo'
+      and (
+        not exists (
+          select 1
+          from public.combos_caja c
+          where c.id = (linea.item ->> 'combo_id')::uuid
+            and c.activo
+            and c.nombre = linea.item ->> 'nombre'
+            and c.precio = (linea.item ->> 'precio_unitario')::numeric
+            and round(c.precio * (linea.item ->> 'cantidad')::integer, 2)
+              = (linea.item ->> 'subtotal')::numeric
+            and (select sum(cp.cantidad) * (linea.item ->> 'cantidad')::integer
+              from public.combo_productos cp
+              where cp.combo_id = c.id) = (linea.item ->> 'unidades')::integer
+            and linea.item -> 'componentes' = (
+              select jsonb_agg(jsonb_build_object(
+                'codigo', cp.codigo, 'nombre', p.nombre, 'cantidad', cp.cantidad
+              ) order by cp.codigo)
+              from public.combo_productos cp
+              join public.productos p on p.codigo = cp.codigo
+              where cp.combo_id = c.id
+            )
+        )
+      )
+  ) then
+    raise exception 'El precio o los productos de un combo ya no coinciden con la configuracion vigente.';
+  end if;
   if (
-    select coalesce(sum((linea.item ->> 'cantidad')::integer), 0)
+    select coalesce(sum(case when linea.item ->> 'tipo_linea' = 'combo'
+      then (linea.item ->> 'unidades')::integer
+      else (linea.item ->> 'cantidad')::integer end), 0)
     from jsonb_array_elements(p_lineas) as linea(item)
   ) <> p_unidades
   or (
@@ -316,7 +500,8 @@ begin
     select 1
     from jsonb_array_elements(p_lineas) as linea(item)
     left join public.productos p on p.codigo = linea.item ->> 'codigo'
-    where p.id is null
+    where coalesce(linea.item ->> 'tipo_linea', 'producto') = 'producto'
+      and (p.id is null
       or coalesce(linea.item ->> 'nombre', '') <> coalesce(p.nombre, '')
       or (case linea.item ->> 'tipo_precio'
         when 'precio_normal' then p.precio_normal
@@ -327,7 +512,7 @@ begin
         coalesce((linea.item ->> 'precio_unitario')::numeric, 0)
           * (linea.item ->> 'cantidad')::integer,
         2
-      ) <> (linea.item ->> 'subtotal')::numeric
+      ) <> (linea.item ->> 'subtotal')::numeric)
   ) then
     raise exception 'El precio o subtotal de una linea no coincide con los precios vigentes.';
   end if;

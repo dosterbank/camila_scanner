@@ -41,6 +41,7 @@
     <button class="menu-link" onclick="vista('etq')">Etiquetas</button>
     <button id="btnAdmin" class="menu-link" onclick="vista('adm')">Inventario</button>
     <button id="btnCodigos" class="menu-link oculto" onclick="vista('cod')">Crear código nuevo</button>
+    <button id="btnCombos" class="menu-link oculto" onclick="vista('combos')">Crear combos</button>
     <button id="btnVentas" class="menu-link oculto" onclick="vista('ventas')">Estadísticas de ventas</button>
     <button id="btnCaja" class="menu-link" onclick="vista('caja')">Cierre de caja</button>
     <button id="btnComprobantes" class="menu-link" onclick="vista('comprobantes')">Revisar comprobantes</button>
@@ -51,7 +52,15 @@
     <div class="card row"><button id="btnEntrada" class="v oculto" onclick="modo(1)">Entradas (+1)</button><button class="r" onclick="modo(-1)">Descargos (−1)</button>
       <b id="modoTxt">Elige un modo</b></div>
     <div id="zonaEscaneo" class="oculto">
-    <div class="row"><input id="codigo" placeholder="Dispara el código aquí" autocomplete="off" disabled></div>
+    <div class="scanner-combo-layout">
+      <div class="card scanner-box"><label for="codigo"><b>Escanear producto</b></label><input id="codigo" placeholder="Dispara el código aquí" autocomplete="off" disabled></div>
+      <div id="comboPedido" class="card combo-pedido">
+        <label for="seleccionarCombo"><b>Agregar combo al pedido</b></label>
+        <div class="row"><select id="seleccionarCombo" onchange="mostrarStockComboPedido()" style="flex:1;min-width:0"><option value="">Cargando combos…</option></select>
+          <button type="button" class="v" onclick="agregarComboPedido()">Agregar</button></div>
+        <div id="stockComboPedido" aria-live="polite"></div>
+      </div>
+    </div>
     <div id="aviso" class="card warn oculto"></div>
 
     <div class="card">
@@ -60,7 +69,7 @@
         <button onclick="nuevoPedido()">Nuevo pedido</button>
       </div>
       <div class="lista" style="max-height:320px">
-        <table><thead><tr><th>Producto</th><th>Cant.</th><th>Precio unitario</th><th>Subtotal</th></tr></thead><tbody id="lista"></tbody></table>
+        <table><thead><tr><th>Producto</th><th>Cant.</th><th>Precio unitario</th><th>Subtotal</th><th></th></tr></thead><tbody id="lista"></tbody></table>
       </div>
       <ul id="errores"></ul>
       <div class="totalbox"><span id="lblTotal">Total</span><b id="totalDin">$0.00</b></div>
@@ -69,6 +78,29 @@
     </div>
 
     <div id="cardExist" class="card">Existencia: <b id="exist">—</b></div>
+    </div>
+  </div>
+
+  <!-- ========== COMBOS (solo admin) ========== -->
+  <div id="combos" class="oculto">
+    <div class="card">
+      <h2 style="margin-top:0">Crear y administrar combos</h2>
+      <label for="buscarProductoCombo"><b>Buscar productos por nombre o código</b></label>
+      <input id="buscarProductoCombo" placeholder="Escribe el nombre o código" oninput="pintarProductosCombo()" style="width:100%;margin:6px 0 12px">
+      <div id="productosCombo" class="combo-productos"></div>
+      <h3>Productos del combo</h3>
+      <div class="lista"><table><thead><tr><th>Producto</th><th>Existencia</th><th>Cantidad</th><th></th></tr></thead><tbody id="componentesCombo"></tbody></table></div>
+      <div class="row combo-form">
+        <label>Nombre del combo <input id="nombreCombo" maxlength="100" placeholder="Ej. Combo familiar"></label>
+        <label>Precio fijo <input id="precioCombo" type="number" min="0" step="0.01" placeholder="0.00"></label>
+        <button id="guardarComboBtn" class="v" type="button" onclick="guardarCombo()">Crear combo</button>
+        <button id="cancelarEdicionCombo" type="button" class="oculto" onclick="cancelarEdicionCombo()">Cancelar edición</button>
+      </div>
+      <p id="combosEstado" role="status"></p>
+    </div>
+    <div class="card">
+      <h3 style="margin-top:0">Combos disponibles y existencias</h3>
+      <div id="listaCombosAdmin"></div>
     </div>
   </div>
 
@@ -225,6 +257,7 @@
 
 <script src="js/app-core.js"></script>
 <script src="js/scanner.js"></script>
+<script src="js/combos.js"></script>
 <script src="js/comprobante.js"></script>
 <script src="js/etiquetas.js"></script>
 <script src="js/inventario.js"></script>

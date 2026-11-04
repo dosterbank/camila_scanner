@@ -36,7 +36,7 @@ function reiniciarUI() {
   $('codigo').disabled = true; $('codigo').value = '';
   limpiarCliente(); $('exist').textContent = '—'; $('aviso').classList.add('oculto'); $('zonaEscaneo').classList.add('oculto');
   $('modalNombre').classList.add('oculto'); $('modalComp').classList.add('oculto');
-  $('btnEntrada').classList.add('oculto'); $('btnCodigos').classList.add('oculto'); $('btnNuevoCod').classList.add('oculto'); $('admMov').classList.add('oculto');
+  $('btnEntrada').classList.add('oculto'); $('btnCodigos').classList.add('oculto'); $('btnCombos').classList.add('oculto'); $('btnNuevoCod').classList.add('oculto'); $('admMov').classList.add('oculto');
   $('btnVentas').classList.add('oculto'); $('btnCaja').classList.add('oculto');
   $('menu').classList.add('oculto'); $('menuBackdrop').classList.add('oculto');
   $('btnMenu').setAttribute('aria-expanded', 'false'); $('btnVolver').classList.add('oculto'); rolCargado = false;
@@ -137,8 +137,9 @@ function alternarMenu(forzar) {
 document.addEventListener('keydown', e => { if (e.key === 'Escape') alternarMenu(false); });
 function vista(v) {
   if (v === 'cod' && !esAdmin) v = 'inicio';   // crear códigos: solo admin
+  if (v === 'combos' && !esAdmin) v = 'inicio';
   if (v === 'ventas' && !esAdmin) v = 'inicio';
-  ['inicio', 'etq', 'adm', 'cod', 'ventas', 'caja', 'comprobantes'].forEach(x => $(x).classList.toggle('oculto', x !== v));
+  ['inicio', 'etq', 'adm', 'cod', 'combos', 'ventas', 'caja', 'comprobantes'].forEach(x => $(x).classList.toggle('oculto', x !== v));
   alternarMenu(false);
   if (v === 'inicio' && delta) document.body.className = delta > 0 ? 'entrada' : 'salida';
   else document.body.className = '';
@@ -147,9 +148,11 @@ function vista(v) {
   if (v === 'inicio' || v === 'etq') cargarCatalogo();
   if (v === 'adm') { cargarAdmin(); if (esAdmin) reporte(); }
   if (v === 'cod') abrirCodigos();
+  if (v === 'combos') abrirCombos();
   if (v === 'ventas') cargarEstadisticasVentas();
   if (v === 'caja') cargarCaja();
   if (v === 'comprobantes') cargarComprobantes();
+  if (v === 'inicio') cargarCombosPedido();
   if (v === 'inicio' && !$('codigo').disabled) $('codigo').focus();
 }
 async function cargarRol(uid, intento = 0) {
@@ -166,6 +169,7 @@ async function cargarRol(uid, intento = 0) {
   // Inventario lo ve todo el mundo (solo lectura); crear códigos y editar es solo admin
   $('btnEntrada').classList.toggle('oculto', !esAdmin);
   $('btnCodigos').classList.toggle('oculto', !esAdmin);
+  $('btnCombos').classList.toggle('oculto', !esAdmin);
   $('btnNuevoCod').classList.toggle('oculto', !esAdmin);
   $('btnVentas').classList.toggle('oculto', !esAdmin);
   $('btnCaja').classList.toggle('oculto', !uidActual);
@@ -189,8 +193,11 @@ async function traerTodos(cols) {
 async function cargarCatalogo() {
   try {
     let data;
-    try { data = await traerTodos('id,codigo,nombre,precio_normal,precio_en_vivo,precio_mayorista'); }
-    catch (e) { data = await traerTodos('id,codigo,nombre'); }   // si el rol no puede leer precios
+    try { data = await traerTodos('id,codigo,nombre,cantidad,precio_normal,precio_en_vivo,precio_mayorista'); }
+    catch (e) {
+      try { data = await traerTodos('id,codigo,nombre,cantidad'); }
+      catch (err) { data = await traerTodos('id,codigo,nombre'); }
+    }   // si el rol no puede leer precios o existencias
     data.sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es'));
     catalogo = data; indice = new Map(data.map(p => [p.codigo, p]));
     pintarCat(); pintarPedido();
