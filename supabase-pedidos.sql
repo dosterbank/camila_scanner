@@ -558,6 +558,10 @@ language plpgsql
 security definer
 set search_path = pg_catalog, pg_temp
 as $$
+declare
+  v_inicio timestamptz;
+  v_fin timestamptz;
+  v_ultimo_cierre timestamptz;
 begin
   if auth.uid() is null then
     raise exception 'Se requiere una sesion iniciada.';
@@ -570,11 +574,17 @@ begin
   if not public.comprobar_limite_rpc('ventas_caja_dia', 30) then
     raise exception 'Demasiadas consultas. Espera un minuto e intenta de nuevo.';
   end if;
+  v_inicio := p_fecha::timestamp at time zone p_zona;
+  v_fin := (p_fecha + 1)::timestamp at time zone p_zona;
+  select max(c.cerrado_en) into v_ultimo_cierre
+  from public.cierres_caja c
+  where c.cerrado_en < v_fin;
   return query
   select p.numero, p.fecha, p.usuario, p.cliente_nombre, p.unidades, p.total
   from public.pedidos p
-  where p.fecha >= (p_fecha::timestamp at time zone p_zona)
-    and p.fecha < ((p_fecha + 1)::timestamp at time zone p_zona)
+  where p.fecha < v_fin
+    and (p.fecha > coalesce(v_ultimo_cierre, v_inicio)
+      or (v_ultimo_cierre is null and p.fecha = v_inicio))
     and p.tipo = 'venta'
   order by p.fecha desc
   limit 5000;
@@ -619,6 +629,10 @@ language plpgsql
 security definer
 set search_path = pg_catalog, pg_temp
 as $$
+declare
+  v_inicio timestamptz;
+  v_fin timestamptz;
+  v_ultimo_cierre timestamptz;
 begin
   if auth.uid() is null then
     raise exception 'Se requiere una sesion iniciada.';
@@ -631,11 +645,17 @@ begin
   if not public.comprobar_limite_rpc('resumen_caja_dia', 30) then
     raise exception 'Demasiadas consultas. Espera un minuto e intenta de nuevo.';
   end if;
+  v_inicio := p_fecha::timestamp at time zone p_zona;
+  v_fin := (p_fecha + 1)::timestamp at time zone p_zona;
+  select max(c.cerrado_en) into v_ultimo_cierre
+  from public.cierres_caja c
+  where c.cerrado_en < v_fin;
   return query
   select count(*)::bigint, coalesce(sum(p.unidades), 0)::bigint, coalesce(sum(p.total), 0)::numeric
   from public.pedidos p
-  where p.fecha >= (p_fecha::timestamp at time zone p_zona)
-    and p.fecha < ((p_fecha + 1)::timestamp at time zone p_zona)
+  where p.fecha < v_fin
+    and (p.fecha > coalesce(v_ultimo_cierre, v_inicio)
+      or (v_ultimo_cierre is null and p.fecha = v_inicio))
     and p.tipo = 'venta';
 end;
 $$;
@@ -709,6 +729,9 @@ declare
   v_pedidos integer;
   v_unidades integer;
   v_total numeric(12, 2);
+  v_inicio timestamptz;
+  v_fin timestamptz;
+  v_ultimo_cierre timestamptz;
 begin
   if v_usuario is null then
     raise exception 'Se requiere una sesion iniciada.';
@@ -725,11 +748,17 @@ begin
     raise exception 'Demasiados cierres. Espera un minuto e intenta de nuevo.';
   end if;
 
+  v_inicio := p_fecha::timestamp at time zone p_zona;
+  v_fin := (p_fecha + 1)::timestamp at time zone p_zona;
+  select max(c.cerrado_en) into v_ultimo_cierre
+  from public.cierres_caja c
+  where c.cerrado_en < v_fin;
   select count(*)::integer, coalesce(sum(p.unidades), 0)::integer, coalesce(sum(p.total), 0)::numeric(12, 2)
   into v_pedidos, v_unidades, v_total
   from public.pedidos p
-  where p.fecha >= (p_fecha::timestamp at time zone p_zona)
-    and p.fecha < ((p_fecha + 1)::timestamp at time zone p_zona)
+  where p.fecha < v_fin
+    and (p.fecha > coalesce(v_ultimo_cierre, v_inicio)
+      or (v_ultimo_cierre is null and p.fecha = v_inicio))
     and p.tipo = 'venta';
 
   v_email := coalesce(nullif(auth.jwt() ->> 'email', ''), v_usuario::text);

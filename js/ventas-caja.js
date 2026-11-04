@@ -138,9 +138,10 @@ async function cargarCaja() {
     if (cierres.error) throw cierres.error;
     if (resumen.error) throw resumen.error;
     const filas = ventas.data || [];
-    const total = Number(resumen.data && resumen.data.total || 0);
-    const unidades = Number(resumen.data && resumen.data.unidades || 0);
-    const numeroPedidos = Number(resumen.data && resumen.data.pedidos || 0);
+    const datosResumen = (resumen.data || [])[0] || {};
+    const total = Number(datosResumen.total || 0);
+    const unidades = Number(datosResumen.unidades || 0);
+    const numeroPedidos = Number(datosResumen.pedidos || 0);
     $('cajaResumen').textContent = `${numeroPedidos} pedido(s) · ${unidades} unidad(es) · ${fmt(total)}` +
       (filas.length < numeroPedidos ? ` · mostrando ${filas.length} pedidos recientes` : '');
     $('cajaPedidos').innerHTML = filas.map(p => `<tr>
