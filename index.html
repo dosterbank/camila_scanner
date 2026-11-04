@@ -162,11 +162,11 @@
   <div id="comprobantes" class="oculto">
       <div class="card">
         <div class="row" style="justify-content:space-between">
-          <div><h2 style="margin:0">Revisar comprobantes</h2><small>Ventas registradas para el día seleccionado</small></div>
+          <div><h2 style="margin:0">Revisar comprobantes</h2><small>Ventas y entradas registradas para el día seleccionado</small></div>
           <label>Fecha <input id="fechaComprobantes" type="date" onchange="cargarComprobantes()"></label>
         </div>
         <p id="comprobantesEstado" role="status"></p>
-        <div class="lista"><table id="tablaComprobantes"><thead><tr><th>Hora</th><th>N.º comprobante</th><th>Usuario</th><th>Cliente</th><th>Unidades</th><th>Total</th><th>Detalle</th></tr></thead><tbody id="comprobantesPedidos"></tbody></table></div>
+        <div class="lista"><table id="tablaComprobantes"><thead><tr><th>Hora</th><th>N.º comprobante</th><th>Tipo</th><th>Usuario</th><th>Cliente</th><th>Unidades</th><th>Total</th><th>Detalle</th></tr></thead><tbody id="comprobantesPedidos"></tbody></table></div>
     </div>
   </div>
 </div>
@@ -188,11 +188,12 @@
   <div class="caja">
     <b>Datos del cliente <small>(todo opcional)</small></b>
     <div class="row" style="margin:8px 0">
-      <input id="buscarCliente" placeholder="Cédula/RUC o correo de un cliente anterior" autocomplete="off" style="flex:1;min-width:200px">
+      <input id="buscarCliente" placeholder="Nombre, cédula/RUC o correo de un cliente anterior" autocomplete="off" style="flex:1;min-width:200px">
       <button type="button" onclick="buscarClienteAnterior()">Buscar cliente</button>
     </div>
 
     <p id="clienteEstado" style="margin:0 0 8px"></p>
+    <div id="clienteResultados" class="cliente-resultados"></div>
     <label class="row" style="margin:8px 0;gap:6px"><input type="checkbox" id="cfinal" onchange="actualizarComp()" style="width:auto"> Consumidor final (sin nombre)</label>
     <input id="cliNom" placeholder="Nombre del cliente" autocomplete="off" oninput="actualizarComp()" style="width:100%;margin-bottom:6px">
     <div class="row" style="margin-bottom:6px;flex-wrap:nowrap">
@@ -202,7 +203,7 @@
     <input id="cliMail" type="email" placeholder="Correo del cliente" autocomplete="off" oninput="actualizarComp()" style="width:100%;margin-bottom:12px">
     <div id="compVista" class="recibo"></div>
     <div class="row" style="margin-top:12px">
-      <button class="v" onclick="pdfComprobante()">Guardar PDF</button>
+      <button class="v" onclick="guardarComprobante()">Guardar comprobante</button>
       <button onclick="imprimirComprobante()">Imprimir</button>
       <button onclick="cerrarComp()">Cerrar</button>
     </div>

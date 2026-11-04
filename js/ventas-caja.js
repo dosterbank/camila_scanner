@@ -235,7 +235,8 @@ async function cargarComprobantes() {
     const filas = data || [];
     $('comprobantesPedidos').innerHTML = filas.map(p => `<tr>
       <td>${esc(new Date(p.fecha).toLocaleTimeString('es', { hour: '2-digit', minute: '2-digit' }))}</td>
-      <td>${esc(p.numero)}</td><td>${esc(p.usuario || '')}</td>
+      <td>${esc(p.numero)}</td><td>${p.tipo === 'entrada' ? 'Entrada' : 'Venta'}</td>
+      <td>${esc(p.usuario || '')}</td>
       <td>${esc(p.cliente_nombre || 'Consumidor final')}</td>
       <td>${Number(p.unidades || 0)}</td><td>${fmt(p.total)}</td>
       <td><button type="button" aria-expanded="false" data-detalle-pedido="${esc(p.numero)}">Ver detalle</button></td>

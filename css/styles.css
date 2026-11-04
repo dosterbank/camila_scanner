@@ -20,9 +20,11 @@ td input{width:100%;min-width:0}
 .lista thead th{position:static;background:#f4edf6;color:#35123e;font-weight:700;box-shadow:0 2px 0 #d9c9de}
 .lista td{vertical-align:middle;white-space:normal}
 .precios{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:3px;width:100%;min-width:0;padding:3px}
-.precios .precio-opcion{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:0;padding:6px 3px;font-size:12px;line-height:1.15;white-space:nowrap}
-.precios .precio-opcion.activo,.precios .precio-opcion[aria-pressed=true]{background:#8f178e;color:#fff;border-color:#8f178e}
-.precios .precio-opcion b{font-size:12px}
+.precios .period-option{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:3px;min-width:0;padding:6px 3px;font-size:12px;line-height:1.15;white-space:nowrap}
+.precios .period-option b{font-size:12px}
+.cliente-resultados{display:grid;gap:4px;margin:0 0 8px}
+.cliente-resultado{display:flex;justify-content:space-between;align-items:center;gap:8px;width:100%;padding:8px 10px;background:#fff;color:#35123e;border:1px solid #e1d8e5;text-align:left}
+.cliente-resultado:hover{background:#f5eafa}
 .inventario-lista{height:calc(100vh - 230px);min-height:320px;max-height:none;padding:0}
 #adm .inventario-lista table{table-layout:fixed;width:calc(100% - 3px)}
 #adm .inventario-lista th:nth-child(1){width:12%}

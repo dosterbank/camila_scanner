@@ -124,7 +124,7 @@ function pintarPedido() {
        ['precio_normal', 'Normal'], ['precio_en_vivo', 'TikTok'], ['precio_mayorista', 'Mayorista']
      ].map(([tipo, etiqueta]) => {
        const p = indice.get(l.codigo), valor = p && p[tipo], seleccionado = (precioElegido[l.codigo] || 'precio_en_vivo') === tipo;
-       return `<button type="button" class="precio-opcion${seleccionado ? ' activo' : ''}" data-codigo="${esc(l.codigo)}" data-precio="${tipo}" aria-pressed="${seleccionado}" ${valor == null || valor === '' ? 'disabled' : ''}><span>${etiqueta}</span><b>${valor == null || valor === '' ? '—' : fmt(valor)}</b></button>`;
+       return `<button type="button" class="period-option precio-opcion${seleccionado ? ' activo' : ''}" data-codigo="${esc(l.codigo)}" data-precio="${tipo}" aria-pressed="${seleccionado}" ${valor == null || valor === '' ? 'disabled' : ''}><span>${etiqueta}</span><b>${valor == null || valor === '' ? '—' : fmt(valor)}</b></button>`;
      }).join('')}</div></td><td>${fmt(l.sub)}</td></tr>`).join('');
   $('errores').innerHTML = pedido.filter(i => i.estado === 'error').map(i =>
     `<li class="s"><span>${esc(i.codigo)}: ${esc(i.nombre)}</span></li>`).join('');
@@ -138,10 +138,10 @@ async function nuevoPedido() {
   if (!pedido.length && !hayCliente()) return;
   if (pedido.some(i => i.estado === 'pendiente')) return alert('Espera a que termine de guardarse el último escaneo.');
   if (!confirm('¿Cerrar este pedido y empezar uno nuevo? El inventario ya quedó registrado.')) return;
-  if (delta < 0 && pedido.length) {
+  if (pedido.length) {
     prepararComprobante();
     try { await guardarPedido(); }
-    catch (e) { alert('No se pudo guardar el pedido en Supabase: ' + e.message); return; }
+    catch (e) { alert('No se pudo guardar el comprobante en Supabase: ' + e.message); return; }
   }
   pedido = []; precioElegido = {}; compActual = null; limpiarCliente(); pintarPedido();
   $('modalComp').classList.add('oculto'); $('estadoPedido').textContent = '';

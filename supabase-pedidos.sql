@@ -37,9 +37,24 @@ create table if not exists public.pedidos (
   total numeric(12, 2) not null check (total >= 0),
   lineas jsonb not null check (jsonb_typeof(lineas) = 'array'),
   usuario text not null,
+  tipo text not null default 'venta',
   creado_en timestamptz not null default now(),
   actualizado_en timestamptz not null default now()
 );
+
+alter table public.pedidos add column if not exists tipo text not null default 'venta';
+do $$
+begin
+  if not exists (
+    select 1 from pg_catalog.pg_constraint
+    where conname = 'pedidos_tipo_check'
+      and conrelid = 'public.pedidos'::regclass
+  ) then
+    alter table public.pedidos
+      add constraint pedidos_tipo_check check (tipo in ('venta', 'entrada'));
+  end if;
+end;
+$$;
 
 alter table public.clientes enable row level security;
 alter table public.pedidos enable row level security;
@@ -157,7 +172,8 @@ $$;
 revoke all on function public.comprobar_limite_rpc(text, integer) from public, anon, authenticated;
 
 drop function if exists public.buscar_cliente(text, text);
-create function public.buscar_cliente(p_documento text, p_correo text)
+drop function if exists public.buscar_cliente(text, text, text);
+create function public.buscar_cliente(p_documento text, p_correo text, p_nombre text)
 returns table (nombre text, documento text, telefono text, correo text, rate_limited boolean)
 language plpgsql
 security definer
@@ -169,8 +185,10 @@ begin
   end if;
   if length(coalesce(p_documento, '')) > 50
     or length(coalesce(p_correo, '')) > 254
+    or length(coalesce(p_nombre, '')) > 200
     or (nullif(btrim(coalesce(p_documento, '')), '') is null
-      and nullif(btrim(coalesce(p_correo, '')), '') is null) then
+      and nullif(btrim(coalesce(p_correo, '')), '') is null
+      and nullif(btrim(coalesce(p_nombre, '')), '') is null) then
     raise exception 'Criterio de busqueda no valido.';
   end if;
 
@@ -197,16 +215,23 @@ begin
         nullif(lower(btrim(coalesce(p_correo, ''))), '') is not null
         and c.correo_normalizado = nullif(lower(btrim(coalesce(p_correo, ''))), '')
       )
+      or (
+        length(btrim(coalesce(p_nombre, ''))) >= 2
+        and position(lower(btrim(p_nombre)) in lower(c.nombre)) > 0
+      )
     )
   order by case
     when c.documento_normalizado =
       nullif(upper(regexp_replace(coalesce(p_documento, ''), '[^[:alnum:]]', '', 'g')), '') then 0
-    else 1
-  end
-  limit 1;
+    when c.correo_normalizado = nullif(lower(btrim(coalesce(p_correo, ''))), '') then 1
+    when lower(c.nombre) = lower(btrim(coalesce(p_nombre, ''))) then 2
+    else 3
+  end, c.actualizado_en desc
+  limit 10;
 end;
 $$;
 
+drop function if exists public.guardar_pedido(text, timestamptz, numeric, integer, jsonb, text, text, text, text, text);
 create or replace function public.guardar_pedido(
   p_numero text,
   p_fecha timestamptz,
@@ -217,7 +242,8 @@ create or replace function public.guardar_pedido(
   p_cliente_nombre text,
   p_documento text,
   p_telefono text,
-  p_correo text
+  p_correo text,
+  p_tipo text
 )
 returns uuid
 language plpgsql
@@ -232,6 +258,7 @@ declare
   v_cliente_id uuid;
   v_pedido_id uuid;
   v_usuario text;
+  v_usuario_pedido text;
 begin
   if auth.uid() is null then
     raise exception 'Se requiere una sesion iniciada.';
@@ -246,6 +273,8 @@ begin
     or length(coalesce(p_telefono, '')) > 40
     or length(coalesce(p_correo, '')) > 254
     or length(coalesce(p_usuario, '')) > 254
+    or p_tipo is null or p_tipo not in ('venta', 'entrada')
+    or p_fecha is null
     or p_total is null or p_total < 0 or p_total > 9999999999.99
     or p_unidades is null or p_unidades < 0 or p_unidades > 999999
     or p_lineas is null
@@ -303,11 +332,13 @@ begin
     raise exception 'El precio o subtotal de una linea no coincide con los precios vigentes.';
   end if;
 
-  select id into v_pedido_id
+  v_usuario := coalesce(nullif(auth.jwt() ->> 'email', ''), auth.uid()::text);
+  select id, usuario into v_pedido_id, v_usuario_pedido
   from public.pedidos
-  where numero = btrim(p_numero);
-  if v_pedido_id is not null then
-    return v_pedido_id;
+  where numero = btrim(p_numero)
+  for update;
+  if v_pedido_id is not null and v_usuario_pedido <> v_usuario then
+    raise exception 'No tienes permiso para modificar este comprobante.';
   end if;
   v_documento_normalizado :=
     nullif(upper(regexp_replace(coalesce(p_documento, ''), '[^[:alnum:]]', '', 'g')), '');
@@ -323,22 +354,32 @@ begin
     from public.clientes
     where correo_normalizado = v_correo_normalizado;
   end if;
+  if v_cliente_documento is null and v_cliente_correo is null
+    and nullif(btrim(coalesce(p_cliente_nombre, '')), '') is not null
+    and lower(btrim(p_cliente_nombre)) <> 'consumidor final' then
+    select id into v_cliente_id
+    from public.clientes
+    where lower(btrim(nombre)) = lower(btrim(p_cliente_nombre))
+    order by actualizado_en desc
+    limit 1;
+  end if;
   if v_cliente_documento is not null and v_cliente_correo is not null
     and v_cliente_documento <> v_cliente_correo then
     raise exception 'La cedula/RUC y el correo pertenecen a clientes distintos. Busca el cliente correcto antes de guardar.';
   end if;
 
-  v_cliente_id := coalesce(v_cliente_documento, v_cliente_correo);
-  v_usuario := coalesce(nullif(auth.jwt() ->> 'email', ''), auth.uid()::text);
+  v_cliente_id := coalesce(v_cliente_documento, v_cliente_correo, v_cliente_id);
   if v_cliente_id is not null then
     update public.clientes
-    set nombre = coalesce(nombre, nullif(btrim(p_cliente_nombre), '')),
-        documento = coalesce(documento, nullif(btrim(p_documento), '')),
-        telefono = coalesce(telefono, nullif(btrim(p_telefono), '')),
-        correo = coalesce(correo, nullif(btrim(p_correo), '')),
+    set nombre = coalesce(nullif(btrim(p_cliente_nombre), ''), nombre),
+        documento = coalesce(nullif(btrim(p_documento), ''), documento),
+        telefono = coalesce(nullif(btrim(p_telefono), ''), telefono),
+        correo = coalesce(nullif(btrim(p_correo), ''), correo),
         actualizado_en = now()
     where id = v_cliente_id;
-  elsif v_documento_normalizado is not null or v_correo_normalizado is not null then
+  elsif nullif(btrim(coalesce(p_cliente_nombre, '')), '') is not null
+    or v_documento_normalizado is not null or v_correo_normalizado is not null
+    or nullif(btrim(coalesce(p_telefono, '')), '') is not null then
     insert into public.clientes (nombre, documento, telefono, correo)
     values (
       coalesce(nullif(btrim(p_cliente_nombre), ''), 'Cliente'),
@@ -349,24 +390,39 @@ begin
     returning id into v_cliente_id;
   end if;
 
-  insert into public.pedidos (
-    numero, fecha, cliente_id, cliente_nombre, documento, telefono, correo,
-    unidades, total, lineas, usuario
-  )
-  values (
-    btrim(p_numero), now(), v_cliente_id,
-    coalesce(nullif(btrim(p_cliente_nombre), ''), 'Consumidor final'),
-    nullif(btrim(p_documento), ''), nullif(btrim(p_telefono), ''),
-    nullif(btrim(p_correo), ''), p_unidades, p_total, p_lineas,
-    v_usuario
-  )
-  on conflict (numero) do nothing
-  returning id into v_pedido_id;
-
-  if v_pedido_id is null then
-    select id into v_pedido_id
-    from public.pedidos
-    where numero = btrim(p_numero);
+  if v_pedido_id is not null then
+    update public.pedidos
+    set fecha = p_fecha, cliente_id = v_cliente_id,
+        cliente_nombre = coalesce(nullif(btrim(p_cliente_nombre), ''), 'Consumidor final'),
+        documento = nullif(btrim(p_documento), ''),
+        telefono = nullif(btrim(p_telefono), ''),
+        correo = nullif(btrim(p_correo), ''),
+        unidades = p_unidades, total = p_total, lineas = p_lineas, tipo = p_tipo,
+        actualizado_en = now()
+    where id = v_pedido_id;
+  else
+    insert into public.pedidos (
+      numero, fecha, cliente_id, cliente_nombre, documento, telefono, correo,
+      unidades, total, lineas, usuario, tipo
+    )
+    values (
+      btrim(p_numero), p_fecha, v_cliente_id,
+      coalesce(nullif(btrim(p_cliente_nombre), ''), 'Consumidor final'),
+      nullif(btrim(p_documento), ''), nullif(btrim(p_telefono), ''),
+      nullif(btrim(p_correo), ''), p_unidades, p_total, p_lineas,
+      v_usuario, p_tipo
+    )
+    on conflict (numero) do update set
+      fecha = excluded.fecha, cliente_id = excluded.cliente_id,
+      cliente_nombre = excluded.cliente_nombre, documento = excluded.documento,
+      telefono = excluded.telefono, correo = excluded.correo,
+      unidades = excluded.unidades, total = excluded.total,
+      lineas = excluded.lineas, tipo = excluded.tipo, actualizado_en = now()
+    where public.pedidos.usuario = v_usuario
+    returning id into v_pedido_id;
+    if v_pedido_id is null then
+      raise exception 'No tienes permiso para modificar este comprobante.';
+    end if;
   end if;
   return v_pedido_id;
 end;
@@ -420,6 +476,7 @@ begin
     from public.pedidos p
     where p.fecha >= (v_inicio::timestamp at time zone p_zona)
       and p.fecha < (v_fin::timestamp at time zone p_zona)
+      and p.tipo = 'venta'
     group by 1
   )
   select b.dia, coalesce(v.importe, 0), coalesce(v.cantidad, 0)
@@ -471,6 +528,7 @@ begin
     cross join lateral jsonb_array_elements(p.lineas) as linea(item)
     where p.fecha >= (v_inicio::timestamp at time zone p_zona)
       and p.fecha < (v_fin::timestamp at time zone p_zona)
+      and p.tipo = 'venta'
     group by linea.item ->> 'codigo', linea.item ->> 'nombre'
   ), ordenados as (
     select p.codigo, p.producto, p.unidades,
@@ -517,14 +575,17 @@ begin
   from public.pedidos p
   where p.fecha >= (p_fecha::timestamp at time zone p_zona)
     and p.fecha < ((p_fecha + 1)::timestamp at time zone p_zona)
+    and p.tipo = 'venta'
   order by p.fecha desc
   limit 5000;
 end;
 $$;
 
-create or replace function public.comprobantes_dia(p_fecha date, p_zona text)
+drop function if exists public.comprobantes_dia(date, text);
+create function public.comprobantes_dia(p_fecha date, p_zona text)
 returns table (
-  numero text, fecha timestamptz, usuario text, cliente_nombre text, unidades integer, total numeric
+  numero text, fecha timestamptz, usuario text, cliente_nombre text, tipo text,
+  unidades integer, total numeric
 )
 language plpgsql
 security definer
@@ -543,7 +604,7 @@ begin
     raise exception 'Demasiadas consultas. Espera un minuto e intenta de nuevo.';
   end if;
   return query
-  select p.numero, p.fecha, p.usuario, p.cliente_nombre, p.unidades, p.total
+  select p.numero, p.fecha, p.usuario, p.cliente_nombre, p.tipo, p.unidades, p.total
   from public.pedidos p
   where p.fecha >= (p_fecha::timestamp at time zone p_zona)
     and p.fecha < ((p_fecha + 1)::timestamp at time zone p_zona)
@@ -574,7 +635,8 @@ begin
   select count(*)::bigint, coalesce(sum(p.unidades), 0)::bigint, coalesce(sum(p.total), 0)::numeric
   from public.pedidos p
   where p.fecha >= (p_fecha::timestamp at time zone p_zona)
-    and p.fecha < ((p_fecha + 1)::timestamp at time zone p_zona);
+    and p.fecha < ((p_fecha + 1)::timestamp at time zone p_zona)
+    and p.tipo = 'venta';
 end;
 $$;
 
@@ -667,7 +729,8 @@ begin
   into v_pedidos, v_unidades, v_total
   from public.pedidos p
   where p.fecha >= (p_fecha::timestamp at time zone p_zona)
-    and p.fecha < ((p_fecha + 1)::timestamp at time zone p_zona);
+    and p.fecha < ((p_fecha + 1)::timestamp at time zone p_zona)
+    and p.tipo = 'venta';
 
   v_email := coalesce(nullif(auth.jwt() ->> 'email', ''), v_usuario::text);
   return query
@@ -697,9 +760,9 @@ grant execute on function public.historial_cierres_caja(date) to authenticated;
 grant execute on function public.detalle_pedido(text) to authenticated;
 grant execute on function public.cerrar_caja_sin_novedades(date, text) to authenticated;
 
-revoke all on function public.buscar_cliente(text, text) from public, anon;
-revoke all on function public.guardar_pedido(text, timestamptz, numeric, integer, jsonb, text, text, text, text, text) from public, anon;
-grant execute on function public.buscar_cliente(text, text) to authenticated;
-grant execute on function public.guardar_pedido(text, timestamptz, numeric, integer, jsonb, text, text, text, text, text) to authenticated;
+revoke all on function public.buscar_cliente(text, text, text) from public, anon;
+revoke all on function public.guardar_pedido(text, timestamptz, numeric, integer, jsonb, text, text, text, text, text, text) from public, anon;
+grant execute on function public.buscar_cliente(text, text, text) to authenticated;
+grant execute on function public.guardar_pedido(text, timestamptz, numeric, integer, jsonb, text, text, text, text, text, text) to authenticated;
 
 notify pgrst, 'reload schema';

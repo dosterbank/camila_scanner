@@ -12,7 +12,7 @@ Aplicación web estática de inventario y ventas. Usa Supabase para autenticaci�
 
 1. En Supabase, abre **Project Settings > API** y localiza la URL del proyecto y la clave **publishable** (o la clave `anon` heredada).
 2. Revisa `SUPABASE_URL` y `SUPABASE_KEY` al inicio de `js/app-core.js` y configúralas para tu proyecto.
-3. En **SQL Editor**, ejecuta el contenido completo de `supabase-pedidos.sql`. Vuelve a ejecutar el archivo después de actualizarlo para aplicar cambios a las funciones de estadísticas. Hazlo en el proyecto correcto y conserva una copia de seguridad antes de aplicar cambios a una base de datos que ya tenga información.
+3. En **SQL Editor**, ejecuta el contenido completo de `supabase-pedidos.sql`. Vuelve a ejecutar el archivo después de actualizarlo para aplicar cambios al esquema y las funciones de pedidos, clientes, estadísticas y caja. La versión actual guarda ventas y entradas, permite actualizar un comprobante existente y buscar clientes por nombre. Hazlo en el proyecto correcto y conserva una copia de seguridad antes de aplicar cambios a una base de datos que ya tenga información.
 4. En **Authentication**, crea las cuentas de los usuarios y configura las URL de redirección para el dominio local y el de GitHub Pages.
 5. Comprueba que las políticas RLS y los roles de usuario estén configurados antes de operar con datos reales.
 
@@ -36,7 +36,7 @@ Abre <http://localhost:8000>. No abras `index.html` directamente como archivo: l
 4. Añade esa URL, incluyendo la ruta del repositorio si corresponde, a las URL permitidas de Supabase Authentication.
 5. Prueba el inicio de sesión, escaneo, inventario, ventas y cierre de caja con las cuentas y permisos apropiados.
 
-Las estadísticas ofrecen tres periodos: hoy, los últimos siete días (incluido hoy) y cada día del mes actual. El control secundario cambia entre barras de ventas y el gráfico circular de unidades vendidas por producto. El gráfico circular muestra primero el producto más vendido. El menú **Revisar comprobantes** permite consultar las ventas de una fecha y desplegar el detalle de cada pedido. Al actualizar `supabase-pedidos.sql`, vuelve a ejecutarlo en Supabase para instalar o actualizar las funciones de estadísticas y consulta de comprobantes.
+Las estadísticas ofrecen tres periodos: hoy, los últimos siete días (incluido hoy) y cada día del mes actual. El control secundario cambia entre barras de ventas y el gráfico circular de unidades vendidas por producto. El gráfico circular muestra primero el producto más vendido. El menú **Revisar comprobantes** permite consultar ventas y entradas de una fecha y desplegar el detalle de cada comprobante. Guardar o imprimir un comprobante persiste sus datos y los del cliente en Supabase; guardar permite volver a descargar el PDF con el nombre del cliente y la fecha/hora del pedido.
 
 Las referencias a CSS y JavaScript son relativas para que también funcionen cuando el sitio se publica bajo una ruta de repositorio.
 

@@ -8,6 +8,7 @@ const CSS_RECIBO = `.recibo{max-width:320px;margin:0 auto;padding:12px;border:1p
 .recibo .tot{display:flex;justify-content:space-between;font-weight:bold;font-size:1.25em}`;
 document.head.appendChild(Object.assign(document.createElement('style'), { textContent: CSS_RECIBO }));
 
+let clientesEncontrados = [];
 const p2 = n => String(n).padStart(2, '0');
 const fechaTxt = d => `${p2(d.getDate())}/${p2(d.getMonth() + 1)}/${d.getFullYear()} ${p2(d.getHours())}:${p2(d.getMinutes())}:${p2(d.getSeconds())}`;
 const fechaNum = d => `${d.getFullYear()}${p2(d.getMonth() + 1)}${p2(d.getDate())}-${p2(d.getHours())}${p2(d.getMinutes())}${p2(d.getSeconds())}${String(d.getMilliseconds()).padStart(3, '0')}`;
@@ -30,12 +31,13 @@ function verComprobante() {
   if (!ls.length) return alert('No hay productos en el pedido.');
   prepararComprobante();
   $('modalComp').classList.remove('oculto');
-  if (compActual.venta) guardarPedido().catch(e => mostrarErrorGuardado(e));
+  guardarPedido().catch(mostrarErrorGuardado);
 }
 const DATOS_CLIENTE = ['cliNom', 'cliDoc', 'cliTel', 'cliMail'];
 function limpiarCliente() {
   $('cfinal').checked = false; DATOS_CLIENTE.forEach(i => $(i).value = '');
   $('cliNom').disabled = false; $('buscarCliente').value = ''; $('clienteEstado').textContent = '';
+  $('clienteResultados').replaceChildren(); clientesEncontrados = [];
 }
 function hayCliente() { return $('cfinal').checked || DATOS_CLIENTE.some(i => $(i).value.trim()); }
 function prepararComprobante() {
@@ -60,20 +62,26 @@ function actualizarComp() {
   compActual.tel = $('cliTel').value.trim();
   compActual.correo = $('cliMail').value.trim();
   $('compVista').innerHTML = htmlRecibo(compActual);
-  if (compActual.venta) programarGuardadoPedido();
+  programarGuardadoPedido();
 }
 async function buscarClienteAnterior() {
   const entrada = $('buscarCliente').value.trim();
-  const documento = entrada ? (entrada.includes('@') ? '' : entrada) : $('cliDoc').value.trim();
+  const esDocumento = /^[\d.\-\s]+$/.test(entrada);
+  const documento = entrada ? (entrada.includes('@') || !esDocumento ? '' : entrada) : $('cliDoc').value.trim();
   const correo = entrada ? (entrada.includes('@') ? entrada : '') : $('cliMail').value.trim();
-  if (!documento && !correo) {
+  const nombre = entrada && !entrada.includes('@') && !esDocumento ? entrada : (!entrada ? $('cliNom').value.trim() : '');
+  if (!documento && !correo && nombre.length < 2) {
     $('clienteEstado').className = 's';
-    $('clienteEstado').textContent = 'Escribe una cédula/RUC o un correo para buscar.';
+    $('clienteEstado').textContent = 'Escribe un nombre (al menos 2 caracteres), una cédula/RUC o un correo para buscar.';
+    $('clienteResultados').replaceChildren();
     return;
   }
   $('clienteEstado').className = '';
   $('clienteEstado').textContent = 'Buscando cliente…';
-  const { data, error } = await db.rpc('buscar_cliente', { p_documento: documento || null, p_correo: correo || null });
+  $('clienteResultados').replaceChildren();
+  const { data, error } = await db.rpc('buscar_cliente', {
+    p_documento: documento || null, p_correo: correo || null, p_nombre: nombre || null
+  });
   if (error) {
     $('clienteEstado').className = 's';
     $('clienteEstado').textContent = 'No se pudo buscar el cliente: ' + error.message;
@@ -89,42 +97,59 @@ async function buscarClienteAnterior() {
     $('clienteEstado').textContent = 'No encontramos un cliente con esos datos.';
     return;
   }
-  const c = data[0];
+  clientesEncontrados = data;
+  $('clienteEstado').className = '';
+  $('clienteEstado').textContent = data.length === 1 ? 'Selecciona el cliente encontrado.' : `Encontramos ${data.length} coincidencias. Selecciona el cliente correcto.`;
+  $('clienteResultados').innerHTML = data.map((c, i) =>
+    `<button type="button" class="cliente-resultado" onclick="seleccionarClienteAnterior(${i})"><span><b>${esc(c.nombre || 'Cliente')}</b><br><small>${esc(c.documento || c.correo || c.telefono || '')}</small></span><span>Seleccionar</span></button>`
+  ).join('');
+}
+function seleccionarClienteAnterior(indice) {
+  const c = clientesEncontrados[indice];
+  if (!c) return;
   $('cfinal').checked = false;
   $('cliNom').value = c.nombre || '';
   $('cliDoc').value = c.documento || '';
   $('cliTel').value = c.telefono || '';
   $('cliMail').value = c.correo || '';
+  $('clienteResultados').replaceChildren();
   $('clienteEstado').className = 'e';
   $('clienteEstado').textContent = 'Cliente recuperado.';
   actualizarComp();
 }
 function mostrarErrorGuardado(e) {
   $('estadoPedido').className = 's';
-  $('estadoPedido').textContent = 'No se pudo guardar el pedido: ' + e.message;
-  console.error('No se pudo guardar el pedido:', e);
+  $('estadoPedido').textContent = 'No se pudo guardar el comprobante: ' + e.message;
+  console.error('No se pudo guardar el comprobante:', e);
 }
 function programarGuardadoPedido() {
   clearTimeout(timerGuardado);
   $('estadoPedido').className = '';
-  $('estadoPedido').textContent = 'Guardando pedido…';
+  $('estadoPedido').textContent = 'Guardando comprobante…';
   timerGuardado = setTimeout(() => guardarPedido().catch(mostrarErrorGuardado), 600);
 }
 async function guardarPedido() {
   clearTimeout(timerGuardado);
-  if (!compActual || !compActual.venta) return;
+  if (!compActual) return;
   const c = compActual;
-  const lineasPedido = c.lineas.map(l => ({
+  const datos = {
+    p_numero: c.numero,
+    p_fecha: c.fecha.toISOString(),
+    p_total: c.total,
+    p_unidades: c.unidades,
+    p_usuario: c.usuario,
+    p_cliente_nombre: c.cliente === 'Consumidor final' ? null : c.cliente,
+    p_documento: c.doc || null,
+    p_telefono: c.tel || null,
+    p_correo: c.correo || null,
+    p_tipo: c.venta ? 'venta' : 'entrada'
+  };
+  datos.p_lineas = c.lineas.map(l => ({
     codigo: l.codigo, nombre: l.nombre, cantidad: l.cant,
     precio_unitario: l.precio, subtotal: l.sub, tipo_precio: l.precioTipo
   }));
   const ejecutar = async () => {
-    const { data, error } = await db.rpc('guardar_pedido', {
-      p_numero: c.numero, p_fecha: c.fecha.toISOString(), p_total: c.total,
-      p_unidades: c.unidades, p_lineas: lineasPedido, p_usuario: c.usuario,
-      p_cliente_nombre: c.cliente === 'Consumidor final' ? null : c.cliente,
-      p_documento: c.doc || null, p_telefono: c.tel || null, p_correo: c.correo || null
-    });
+    const { data, error } = await db.rpc('guardar_pedido', datos);
     if (error) throw error;
     if (!data) throw new Error('Se alcanzó el límite de guardados por minuto. Espera antes de volver a intentarlo.');
   };
@@ -134,7 +159,7 @@ async function guardarPedido() {
   try {
     await actual;
     $('estadoPedido').className = 'e';
-    $('estadoPedido').textContent = 'Pedido guardado en Supabase.';
+    $('estadoPedido').textContent = 'Comprobante guardado en Supabase.';
   } catch (e) {
     mostrarErrorGuardado(e);
     throw e;
@@ -148,12 +173,17 @@ function compValido() {
 }
 function cerrarComp() { $('modalComp').classList.add('oculto'); if (!$('codigo').disabled) $('codigo').focus(); }
 
-function imprimirComprobante() {
+async function imprimirComprobante() {
   if (!compActual || !compValido()) return;
-  const css = CSS_RECIBO + `@page{size:80mm auto;margin:0}html,body{width:80mm;margin:0}.recibo{max-width:none;width:72mm;margin:0 auto;border:0;padding:4mm;font-size:9pt}`;
   const w = window.open('', '_blank'); if (!w) return alert('Permite las ventanas emergentes.');
-  w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(compActual.numero)}</title><style>${css}</style></head><body><div class="recibo">${htmlRecibo(compActual)}</div></body></html>`);
-  w.document.close(); w.focus(); setTimeout(() => w.print(), 400);
+  try {
+    await guardarPedido();
+    const css = CSS_RECIBO + `@page{size:80mm auto;margin:0}html,body{width:80mm;margin:0}.recibo{box-sizing:border-box;max-width:none;width:80mm;margin:0;padding:3mm;border:.2mm dashed #888;font-size:9pt}`;
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>${esc(compActual.numero)}</title><style>${css}</style></head><body><div class="recibo">${htmlRecibo(compActual)}</div></body></html>`);
+    w.document.close(); w.focus(); setTimeout(() => w.print(), 400);
+  } catch {
+    w.close();
+  }
 }
 // Dibuja el comprobante en un PDF de 80 mm de ancho (tipo ticket); devuelve la altura usada
 function dibujarPDF(doc, c) {
@@ -189,15 +219,24 @@ function dibujarPDF(doc, c) {
   if (c.venta) { y += 3; doc.setFont('helvetica', 'bold'); centro('Gracias por su compra', 9); y += 4; }
   return y;
 }
-function pdfComprobante() {
+async function guardarComprobante() {
   if (!compActual || !compValido()) return;
   if (!window.jspdf) return alert('No se pudo cargar la librería de PDF. Revisa tu conexión a internet.');
-  const { jsPDF } = window.jspdf;
-  const nuevo = h => new jsPDF({ unit: 'mm', format: [80, h], orientation: 'portrait' });
-  const alto = dibujarPDF(nuevo(3000), compActual);          // primera pasada: medir
-  const doc = nuevo(Math.max(alto + 6, 60));                  // segunda: página a la medida
-  dibujarPDF(doc, compActual);
-  const nombre = compActual.cliente || 'Consumidor final';
-  const archivo = nombre.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[<>:"/\\|?*\x00-\x1F]/g, '-').trim().replace(/\s+/g, '-');
-  doc.save('comprobante-' + (archivo || 'Consumidor-final') + '-' + fechaNum(compActual.fecha) + '.pdf');
+  try { await guardarPedido(); }
+  catch { return; }
+  try {
+    const { jsPDF } = window.jspdf;
+    const nuevo = h => new jsPDF({ unit: 'mm', format: [80, h], orientation: 'portrait' });
+    const alto = dibujarPDF(nuevo(3000), compActual);
+    const doc = nuevo(Math.max(alto + 6, 60));
+    dibujarPDF(doc, compActual);
+    const nombre = compActual.cliente || 'Consumidor final';
+    const archivo = nombre.normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[<>:"/\\|?*\x00-\x1F]/g, '-').trim().replace(/\s+/g, '-');
+    doc.save('comprobante-' + (archivo || 'Consumidor-final') + '-' + fechaNum(compActual.fecha) + '.pdf');
+    $('estadoPedido').textContent = 'Comprobante guardado en Supabase y PDF descargado.';
+  } catch (e) {
+    $('estadoPedido').className = 's';
+    $('estadoPedido').textContent = 'Comprobante guardado, pero no se pudo generar el PDF: ' + e.message;
+    console.error('No se pudo generar el PDF del comprobante:', e);
+  }
 }
