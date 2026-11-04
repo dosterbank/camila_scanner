@@ -128,7 +128,7 @@ begin
     raise exception 'Se requiere una sesion iniciada.';
   end if;
   if p_operacion not in (
-      'buscar_cliente', 'guardar_pedido', 'estadisticas_ventas',
+      'buscar_cliente', 'guardar_pedido', 'estadisticas_ventas', 'productos_mas_vendidos',
       'ventas_caja_dia', 'resumen_caja_dia', 'historial_cierres_caja',
       'detalle_pedido', 'cerrar_caja'
     )
@@ -428,6 +428,70 @@ begin
 end;
 $$;
 
+create or replace function public.productos_mas_vendidos(p_periodo text, p_fecha date, p_zona text)
+returns table (codigo text, producto text, unidades bigint)
+language plpgsql
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+declare
+  v_inicio date;
+  v_fin date;
+begin
+  if auth.uid() is null or not public.usuario_es_admin() then
+    raise exception 'Solo administradores pueden consultar estadisticas.';
+  end if;
+  if p_fecha is null or p_periodo is null or p_periodo not in ('dia', 'semana', 'mes')
+    or p_zona is null
+    or not exists (select 1 from pg_catalog.pg_timezone_names z where z.name = p_zona) then
+    raise exception 'Periodo, fecha o zona horaria no validos.';
+  end if;
+  if not public.comprobar_limite_rpc('productos_mas_vendidos', 30) then
+    raise exception 'Demasiadas consultas. Espera un minuto e intenta de nuevo.';
+  end if;
+
+  case p_periodo
+    when 'dia' then
+      v_inicio := p_fecha;
+      v_fin := p_fecha + 1;
+    when 'semana' then
+      v_inicio := p_fecha - 6;
+      v_fin := p_fecha + 1;
+    when 'mes' then
+      v_inicio := date_trunc('month', p_fecha::timestamp)::date;
+      v_fin := (v_inicio + interval '1 month')::date;
+  end case;
+
+  return query
+  with productos as (
+    select linea.item ->> 'codigo' as codigo,
+      linea.item ->> 'nombre' as producto,
+      sum((linea.item ->> 'cantidad')::bigint)::bigint as unidades
+    from public.pedidos p
+    cross join lateral jsonb_array_elements(p.lineas) as linea(item)
+    where p.fecha >= (v_inicio::timestamp at time zone p_zona)
+      and p.fecha < (v_fin::timestamp at time zone p_zona)
+    group by linea.item ->> 'codigo', linea.item ->> 'nombre'
+  ), ordenados as (
+    select p.codigo, p.producto, p.unidades,
+      row_number() over (order by p.unidades desc, p.producto, p.codigo) as posicion
+    from productos p
+  ), segmentos as (
+    select o.codigo, o.producto, o.unidades
+    from ordenados o
+    where o.posicion <= 8
+    union all
+    select null::text, 'Otros'::text, sum(o.unidades)::bigint
+    from ordenados o
+    where o.posicion > 8
+    having count(*) > 0
+  )
+  select s.codigo, s.producto, s.unidades
+  from segmentos s
+  order by (s.codigo is null), s.unidades desc, s.producto;
+end;
+$$;
+
 create or replace function public.ventas_caja_dia(p_fecha date, p_zona text)
 returns table (
   numero text, fecha timestamptz, usuario text, cliente_nombre text, unidades integer, total numeric
@@ -587,12 +651,14 @@ end;
 $$;
 
 revoke all on function public.estadisticas_ventas(text, date, text) from public, anon;
+revoke all on function public.productos_mas_vendidos(text, date, text) from public, anon;
 revoke all on function public.ventas_caja_dia(date, text) from public, anon;
 revoke all on function public.resumen_caja_dia(date, text) from public, anon;
 revoke all on function public.historial_cierres_caja(date) from public, anon;
 revoke all on function public.detalle_pedido(text) from public, anon;
 revoke all on function public.cerrar_caja_sin_novedades(date, text) from public, anon;
 grant execute on function public.estadisticas_ventas(text, date, text) to authenticated;
+grant execute on function public.productos_mas_vendidos(text, date, text) to authenticated;
 grant execute on function public.ventas_caja_dia(date, text) to authenticated;
 grant execute on function public.resumen_caja_dia(date, text) to authenticated;
 grant execute on function public.historial_cierres_caja(date) to authenticated;

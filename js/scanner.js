@@ -1,7 +1,6 @@
 // ---------- ESCÁNER ----------
 function modo(d) {
-  const t = d > 0 ? 'ENTRADAS: cada código SUMA 1.' : 'DESCARGOS: cada código RESTA 1.';
-  if (!confirm('Vas a registrar ' + t + ' ¿Continuar?')) return;
+  if (d > 0 && !esAdmin) return;
   if (pedido.length && delta && d !== delta) {
     alert('Primero pulsa «Nuevo pedido» para cerrar el pedido actual.');
     return;

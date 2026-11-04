@@ -36,7 +36,7 @@ function reiniciarUI() {
   $('codigo').disabled = true; $('codigo').value = '';
   limpiarCliente(); $('exist').textContent = '—'; $('aviso').classList.add('oculto'); $('zonaEscaneo').classList.add('oculto');
   $('modalNombre').classList.add('oculto'); $('modalComp').classList.add('oculto');
-  $('btnCodigos').classList.add('oculto'); $('btnNuevoCod').classList.add('oculto'); $('admMov').classList.add('oculto');
+  $('btnEntrada').classList.add('oculto'); $('btnCodigos').classList.add('oculto'); $('btnNuevoCod').classList.add('oculto'); $('admMov').classList.add('oculto');
   $('btnVentas').classList.add('oculto'); $('btnCaja').classList.add('oculto');
   $('menu').classList.add('oculto'); $('menuBackdrop').classList.add('oculto');
   $('btnMenu').setAttribute('aria-expanded', 'false'); $('btnVolver').classList.add('oculto'); rolCargado = false;
@@ -163,6 +163,7 @@ async function cargarRol(uid, intento = 0) {
   // junto al correo se ve el rol detectado, para comprobar que quedó bien
   $('quien').textContent = usuarioEmail + ' · ' + (error ? 'no se pudo leer el rol' : !data ? 'sin perfil' : esAdmin ? 'admin' : String(data.rol));
   // Inventario lo ve todo el mundo (solo lectura); crear códigos y editar es solo admin
+  $('btnEntrada').classList.toggle('oculto', !esAdmin);
   $('btnCodigos').classList.toggle('oculto', !esAdmin);
   $('btnNuevoCod').classList.toggle('oculto', !esAdmin);
   $('btnVentas').classList.toggle('oculto', !esAdmin);

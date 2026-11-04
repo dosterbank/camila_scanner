@@ -47,7 +47,7 @@
 
   <!-- ========== ESCÁNER ========== -->
   <div id="inicio">
-    <div class="card row"><button class="v" onclick="modo(1)">Entradas (+1)</button><button class="r" onclick="modo(-1)">Descargos (−1)</button>
+    <div class="card row"><button id="btnEntrada" class="v oculto" onclick="modo(1)">Entradas (+1)</button><button class="r" onclick="modo(-1)">Descargos (−1)</button>
       <b id="modoTxt">Elige un modo</b></div>
     <div id="zonaEscaneo" class="oculto">
     <div class="row"><input id="codigo" placeholder="Dispara el código aquí" autocomplete="off" disabled></div>
@@ -127,9 +127,17 @@
         <button type="button" data-periodo="mes" class="period-option" aria-pressed="false" onclick="seleccionarPeriodoVentas('mes')">Mes</button>
       </div>
       <input id="periodoVentas" type="hidden" value="dia">
+      <div class="period-control chart-control" role="group" aria-label="Tipo de gráfico">
+        <button type="button" data-grafica="barras" class="period-option activo" aria-pressed="true" aria-label="Mostrar gráfico de barras" onclick="seleccionarTipoGraficaVentas('barras')">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 19h16v2H2V3h2v16Zm3-2V9h3v8H7Zm5 0V5h3v12h-3Zm5 0v-6h3v6h-3Z"/></svg><span>Barras</span>
+        </button>
+        <button type="button" data-grafica="pastel" class="period-option" aria-pressed="false" aria-label="Mostrar gráfico de pastel" onclick="seleccionarTipoGraficaVentas('pastel')">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M11 2v10h10A10 10 0 1 1 11 2Zm2 0a10 10 0 0 1 9 9h-9V2Z"/></svg><span>Pastel</span>
+        </button>
+      </div>
       <p id="ventasEstado" role="status"></p>
       <p id="ventasResumen" class="caja-total"></p>
-      <div id="graficaVentas" class="chart" role="img" aria-label="Ventas agrupadas por periodo"></div>
+      <div class="chart-area"><div id="graficaVentas" class="chart" role="img" aria-label="Ventas agrupadas por periodo"></div></div>
     </div>
   </div>
 
