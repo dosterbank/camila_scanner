@@ -1,27 +1,45 @@
-*{box-sizing:border-box}body{margin:0;padding:16px;font:16px/1.4 Arial,sans-serif;background:#eef0ea;color:#141a17;max-width:760px;margin:auto}
+*{box-sizing:border-box}
+body{margin:0;padding:12px;font:16px/1.4 Arial,sans-serif;background:linear-gradient(145deg,#7113a0 0%,#a41591 52%,#f05a3d 100%);color:#141a17}
 body.entrada{background:#2f8a5c}body.salida{background:#b53a3f}
+#app{width:min(96%,1800px);margin:0 auto}
+.app-header{position:sticky;top:0;z-index:20;display:flex;justify-content:space-between;align-items:center;gap:12px;padding:10px 14px;margin:0 0 12px;border-radius:12px;background:rgba(255,255,255,.96);box-shadow:0 4px 18px rgba(35,0,45,.18)}
+.app-user{display:flex;align-items:center;gap:10px;min-width:0}.app-user #quien{overflow-wrap:anywhere}
 input,button,select{font:inherit;padding:10px 12px;border:1px solid #c9cec3;border-radius:6px}
 button{cursor:pointer;background:#141a17;color:#fff;font-weight:600}
 button:disabled{opacity:.5;cursor:not-allowed}
-.v{background:#1f6f4a}.r{background:#9b2226}.card{background:#fff;border-radius:8px;padding:12px;margin:10px 0}
+.v{background:#1f6f4a}.r{background:#9b2226}
+.card{background:#fff;border-radius:10px;padding:14px;margin:10px 0;box-shadow:0 5px 20px rgba(35,0,45,.12)}
 .row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}#codigo{flex:1;font-size:20px}
 li{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid #eee;list-style:none}
 ul{margin:0;padding:0}.e{color:#1f6f4a}.s{color:#9b2226}
-table{width:100%;border-collapse:collapse}td,th{padding:5px;border-bottom:1px solid #eee;text-align:left}
-td input{width:60px}.lista{max-height:420px;overflow:auto}.lista table{min-width:100%}
-.lista thead th{position:sticky;top:0;z-index:2;background:#fff}
-.lista td{vertical-align:top;white-space:normal}
+table{width:100%;border-collapse:separate;border-spacing:0}td,th{padding:7px;border-bottom:1px solid #eee;text-align:left}
+td input{width:100%;min-width:0}
+.lista{max-height:min(62vh,760px);overflow:auto;overscroll-behavior:contain}
+.lista table{width:100%;min-width:0}
+.lista thead{position:sticky;top:0;z-index:5}
+.lista thead th{position:static;background:#f4edf6;color:#35123e;font-weight:700;box-shadow:0 2px 0 #d9c9de}
+.lista td{vertical-align:middle;white-space:normal}
 .lista td input[type=radio]{width:auto;margin:0 3px 0 0;padding:0}
-.precios{display:flex;gap:6px 12px;flex-wrap:wrap;min-width:330px}
+.precios{display:flex;gap:6px 12px;flex-wrap:wrap;min-width:0}
 .precios label{white-space:nowrap;font-size:14px}
-.adm-nombre{min-width:20ch}
-.adm-precio{width:110px!important;min-width:110px}
+.inventario-lista{height:calc(100vh - 230px);min-height:320px;max-height:none;padding:0}
+#adm .inventario-lista table{table-layout:fixed;width:calc(100% - 3px)}
+#adm .inventario-lista th:nth-child(1){width:12%}
+#adm .inventario-lista th:nth-child(2){width:31%}
+#adm .inventario-lista th:nth-child(3){width:8%}
+#adm .inventario-lista th:nth-child(4),#adm .inventario-lista th:nth-child(5){width:12%}
+#adm .inventario-lista th:nth-child(6){width:15%}
+#adm .inventario-lista th:nth-child(7){width:10%}
+#adm .inventario-lista th,#adm .inventario-lista td{padding:7px 8px;overflow-wrap:anywhere}
+.adm-nombre{display:block;width:100%!important;min-width:0!important;max-width:100%;padding:8px}
+.adm-precio{display:block;width:100%!important;min-width:0!important;padding:8px}
+#adm .inventario-lista td:nth-child(3) input{min-width:0}
 .warn{background:#fff3cd;border:1px solid #e0b100}
 .totalbox{display:flex;justify-content:space-between;align-items:center;font-size:22px;margin:10px 0 6px;padding-top:8px;border-top:2px solid #141a17}
 .chip{background:#fff;color:#141a17;border:2px solid #141a17;font-size:18px;min-width:78px}
 .chip:hover{background:#1f6f4a;color:#fff;border-color:#1f6f4a}
 .modal{position:fixed;inset:0;background:rgba(0,0,0,.7);display:flex;align-items:center;justify-content:center;padding:16px;z-index:50}
-.caja{background:#fff;border-radius:10px;padding:18px;max-width:420px;width:100%;max-height:92vh;overflow:auto}
+.caja{background:#fff;border-radius:12px;padding:20px;max-width:min(900px,96vw);width:100%;max-height:92vh;overflow:auto;box-shadow:0 18px 60px rgba(0,0,0,.25)}
 .caja.alerta{border:4px solid #e0b100}
 .combo{position:relative;display:flex;flex:1;min-width:220px}
 .combo input{flex:1;min-width:0;border-radius:6px 0 0 6px}
@@ -45,13 +63,40 @@ body.loginPage{max-width:none;min-height:100vh;padding:24px;display:grid;place-i
 .login-links .flecha{padding:4px 8px;border:0;background:transparent;color:#7d167b}
 .login-card #listaCorreos{text-align:left}
 .login-card .s,.login-card .e{text-align:left}
+.menu-backdrop{position:fixed;inset:0;z-index:29;border:0;border-radius:0;background:rgba(20,10,25,.48);padding:0}
+.dashboard-menu{position:fixed;inset:0 auto 0 0;z-index:30;width:min(310px,86vw);padding:18px 14px;background:#fff;box-shadow:12px 0 36px rgba(35,0,45,.25);display:flex;flex-direction:column;gap:8px;overflow-y:auto}
+.menu-title{display:flex;justify-content:space-between;align-items:center;padding:6px 8px 16px;color:#60136e;font-size:18px}
+.menu-close{padding:4px 10px;background:transparent;color:#35123e;font-size:26px}
+.menu-link{width:100%;padding:12px 14px;border:0;background:transparent;color:#35123e;text-align:left}
+.menu-link:hover,.menu-link:focus-visible{background:#f5eafa;color:#8f178e}
+.period-control{display:inline-flex;gap:4px;padding:4px;border:1px solid #e1d8e5;border-radius:10px;background:#f8f2f9}
+.period-option{min-width:92px;border:0;background:transparent;color:#514357}
+.period-option.activo,.period-option[aria-pressed=true]{background:#8f178e;color:#fff;box-shadow:0 2px 6px rgba(70,0,70,.2)}
 .chart{display:flex;align-items:stretch;gap:6px;min-height:250px;overflow-x:auto;padding:12px 4px 4px;border-bottom:1px solid #c9cec3}
-.bar-col{flex:1;min-width:42px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:5px}
+.bar-col{flex:1;min-width:28px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;gap:5px}
 .bar-value{font-size:11px;white-space:nowrap;writing-mode:vertical-rl;transform:rotate(180deg);max-height:70px;overflow:hidden}
 .bar{width:min(28px,70%);min-height:2px;border-radius:6px 6px 0 0;background:linear-gradient(180deg,#bd248e,#7225a1)}
 .bar-label{font-size:11px;color:#59615c;white-space:nowrap}
 .caja-total{font-size:22px;font-weight:700}
-#tablaCaja{min-width:760px}
+#tablaCaja{table-layout:auto}
 .detalle-lineas{width:100%;border-collapse:collapse}
-.detalle-lineas th{position:sticky;top:0;background:#fff}
-@media(max-width:480px){body.loginPage{padding:16px}.login-card .row{justify-content:center}.chart{min-height:210px}}
+.detalle-lineas th{position:sticky;top:0;background:#f4edf6}
+@media(max-width:700px){
+  body{padding:8px}
+  #app{width:100%}
+  .app-header{align-items:flex-start;padding:8px}
+  .app-user{flex-direction:column;align-items:flex-end;text-align:right;font-size:12px}
+  .inventario-lista{height:calc(100vh - 205px);min-height:260px}
+  #adm .inventario-lista th,#adm .inventario-lista td{padding:3px 1px;font-size:12px}
+  #adm .inventario-lista td button{padding:3px 1px;font-size:12px}
+  .adm-nombre,.adm-precio{padding:5px 2px;font-size:12px}
+  .period-option{min-width:74px;padding:8px}
+  .chart{min-height:210px}
+}
+@media(max-width:420px){
+  .app-header{flex-wrap:wrap}
+  .app-user{flex-direction:row;align-items:center}
+  .inventario-lista{height:calc(100vh - 225px)}
+  #adm .inventario-lista th,#adm .inventario-lista td{font-size:10px;padding:2px 1px}
+  .adm-nombre,.adm-precio{font-size:10px;padding:4px 1px}
+}

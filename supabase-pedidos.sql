@@ -399,14 +399,14 @@ begin
 
   case p_periodo
     when 'dia' then
-      v_unidad := 'day'; v_paso := interval '1 day'; v_ultimo := p_fecha; v_inicio := p_fecha - 29;
+      v_unidad := 'day'; v_paso := interval '1 day'; v_ultimo := p_fecha; v_inicio := p_fecha;
     when 'semana' then
-      v_unidad := 'week'; v_paso := interval '1 week';
-      v_ultimo := date_trunc('week', p_fecha::timestamp)::date; v_inicio := v_ultimo - 77;
+      v_unidad := 'day'; v_paso := interval '1 day';
+      v_ultimo := p_fecha; v_inicio := p_fecha - 6;
     when 'mes' then
-      v_unidad := 'month'; v_paso := interval '1 month';
-      v_ultimo := date_trunc('month', p_fecha::timestamp)::date;
-      v_inicio := (v_ultimo - interval '11 months')::date;
+      v_unidad := 'day'; v_paso := interval '1 day';
+      v_inicio := date_trunc('month', p_fecha::timestamp)::date;
+      v_ultimo := (v_inicio + interval '1 month' - interval '1 day')::date;
   end case;
   v_fin := (v_ultimo::timestamp + v_paso)::date;
 

@@ -10,10 +10,20 @@ function estadoDe(id, mensaje, clase = '') {
   $(id).className = clase;
   $(id).textContent = mensaje;
 }
+function seleccionarPeriodoVentas(periodo) {
+  if (!['dia', 'semana', 'mes'].includes(periodo)) return;
+  document.querySelectorAll('.period-option').forEach(button => {
+    const activo = button.dataset.periodo === periodo;
+    button.classList.toggle('activo', activo);
+    button.setAttribute('aria-pressed', String(activo));
+  });
+  $('periodoVentas').value = periodo;
+  cargarEstadisticasVentas();
+}
 async function cargarEstadisticasVentas() {
   if (!esAdmin) return;
-  const periodo = $('periodoVentas').value;
-  const fecha = $('fechaVentas').value || fechaLocalISO();
+  const periodo = $('periodoVentas').value || 'dia';
+  const fecha = fechaLocalISO();
   estadoDe('ventasEstado', 'Cargando ventas…');
   try {
     const { data, error } = await db.rpc('estadisticas_ventas', {
@@ -27,13 +37,15 @@ async function cargarEstadisticasVentas() {
     const maximo = Math.max(0, ...filas.map(f => Number(f.total || 0)));
     $('graficaVentas').innerHTML = filas.map(f => {
       const fechaBarra = fechaDesdeISO(f.periodo);
-      const etiqueta = periodo === 'mes'
-        ? fechaBarra.toLocaleDateString('es', { month: 'short', year: '2-digit' })
-        : fechaBarra.toLocaleDateString('es', { day: '2-digit', month: '2-digit' });
+      const etiqueta = periodo === 'dia'
+        ? 'Hoy'
+        : periodo === 'mes'
+          ? String(fechaBarra.getDate())
+          : fechaBarra.toLocaleDateString('es', { day: '2-digit', month: '2-digit' });
       const valor = Number(f.total || 0), alto = maximo ? Math.max(2, valor / maximo * 100) : 2;
       return `<div class="bar-col" title="${esc(etiqueta)}: ${fmt(valor)} · ${Number(f.pedidos || 0)} pedido(s)">
         <span class="bar-value">${esc(fmt(valor))}</span><div class="bar" style="height:${alto}%"></div>
-        <span class="bar-label">${periodo === 'semana' ? 'Sem. ' : ''}${esc(etiqueta)}</span>
+        <span class="bar-label">${esc(etiqueta)}</span>
       </div>`;
     }).join('');
     estadoDe('ventasEstado', filas.length ? '' : 'No hay ventas en el periodo.');

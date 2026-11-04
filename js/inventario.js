@@ -17,11 +17,12 @@ function imprimirInventario() {
   if (!lista.length) return alert('No hay productos para imprimir (¿ya cargó el inventario?).');
   const q = $('admBuscar').value.trim();
   const unid = lista.reduce((a, p) => a + (Number(p.cantidad) || 0), 0);
-  const filas = lista.map(p => `<tr><td>${esc(p.codigo)}</td><td>${esc(p.nombre)}</td><td class="d">${p.cantidad}</td><td class="d">${prVer(p.precio_normal)}</td><td class="d">${prVer(p.precio_en_vivo)}</td><td class="d">${prVer(p.precio_mayorista)}</td></tr>`).join('');
+  const filas = lista.map(p => `<tr><td>${esc(p.codigo)}</td><td>${esc(p.nombre)}</td><td class="d">${p.cantidad}</td><td class="d price-cell">${prVer(p.precio_normal)}</td><td class="d price-cell">${prVer(p.precio_en_vivo)}</td><td class="d price-cell">${prVer(p.precio_mayorista)}</td></tr>`).join('');
   const css = `@page{size:A4;margin:12mm}body{font:11pt Arial,sans-serif;color:#000;margin:0}
 h1{font-size:16pt;margin:0}.meta{font-size:9pt;color:#333;margin:2mm 0 4mm}
 table{width:100%;border-collapse:collapse}th,td{border-bottom:1px solid #bbb;padding:1.6mm 1.5mm;text-align:left;font-size:9.5pt}
 th{border-bottom:2px solid #000}thead{display:table-header-group}tr{break-inside:avoid}.d{text-align:right}
+.price-cell{padding-top:2mm;padding-bottom:8mm}
 tfoot td{border-top:2px solid #000;border-bottom:0;font-weight:bold}`;
   const w = window.open('', '_blank'); if (!w) return alert('Permite las ventanas emergentes.');
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Inventario</title><style>${css}</style></head><body>
@@ -45,8 +46,8 @@ function pintarAdm() {
   $('admHead').innerHTML = '<tr><th>Código</th><th>Nombre</th><th>Stock</th><th>Normal</th><th>TikTok</th><th>Mayorista</th><th>Etiq.</th></tr>';
   const num = (id, c, v) => `<td><input class="adm-precio" type="number" step="0.01" value="${v ?? ''}" onchange="guardarCampo(${id},'${c}',this.value)"></td>`;
   $('admCuerpo').innerHTML = lista.map(p =>
-    `<tr><td>${esc(p.codigo)}</td><td><input class="adm-nombre" value="${esc(p.nombre)}" oninput="this.style.width=Math.max(20,Math.min(60,this.value.length+2)+'ch')" onchange="guardarCampo(${p.id},'nombre',this.value)" style="width:${Math.max(20, Math.min(60, String(p.nombre || '').length + 2))}ch"></td>
-     <td><input type="number" value="${p.cantidad}" onchange="ajustarStock(${p.id},this.value)" style="width:70px;${p.cantidad < 0 ? 'color:#9b2226' : ''}"></td>
+    `<tr><td>${esc(p.codigo)}</td><td><input class="adm-nombre" value="${esc(p.nombre)}" title="${esc(p.nombre)}" onchange="guardarCampo(${p.id},'nombre',this.value)"></td>
+     <td><input type="number" value="${p.cantidad}" onchange="ajustarStock(${p.id},this.value)" style="${p.cantidad < 0 ? 'color:#9b2226' : ''}"></td>
      ${num(p.id, 'precio_normal', p.precio_normal)}${num(p.id, 'precio_en_vivo', p.precio_en_vivo)}${num(p.id, 'precio_mayorista', p.precio_mayorista)}${et(p)}</tr>`).join('');
 }
 // Desde el inventario: manda el producto a Etiquetas con cantidad 1

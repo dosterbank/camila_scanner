@@ -38,7 +38,8 @@ function reiniciarUI() {
   $('modalNombre').classList.add('oculto'); $('modalComp').classList.add('oculto');
   $('btnCodigos').classList.add('oculto'); $('btnNuevoCod').classList.add('oculto'); $('admMov').classList.add('oculto');
   $('btnVentas').classList.add('oculto'); $('btnCaja').classList.add('oculto');
-  $('menu').classList.add('oculto'); $('btnVolver').classList.add('oculto'); rolCargado = false;
+  $('menu').classList.add('oculto'); $('menuBackdrop').classList.add('oculto');
+  $('btnMenu').setAttribute('aria-expanded', 'false'); $('btnVolver').classList.add('oculto'); rolCargado = false;
   pintarPedido();
 }
 function mostrar(session) {
@@ -127,12 +128,20 @@ async function guardarClave() {
 }
 $('clave2').addEventListener('keydown', e => { if (e.key === 'Enter') guardarClave(); });
 
-function alternarMenu() { $('menu').classList.toggle('oculto'); }
+function alternarMenu(forzar) {
+  const abrir = typeof forzar === 'boolean' ? forzar : $('menu').classList.contains('oculto');
+  $('menu').classList.toggle('oculto', !abrir);
+  $('menuBackdrop').classList.toggle('oculto', !abrir);
+  $('btnMenu').setAttribute('aria-expanded', String(abrir));
+}
+document.addEventListener('keydown', e => { if (e.key === 'Escape') alternarMenu(false); });
 function vista(v) {
   if (v === 'cod' && !esAdmin) v = 'inicio';   // crear códigos: solo admin
   if (v === 'ventas' && !esAdmin) v = 'inicio';
   ['inicio', 'etq', 'adm', 'cod', 'ventas', 'caja'].forEach(x => $(x).classList.toggle('oculto', x !== v));
-  $('menu').classList.add('oculto');
+  alternarMenu(false);
+  if (v === 'inicio' && delta) document.body.className = delta > 0 ? 'entrada' : 'salida';
+  else document.body.className = '';
   $('btnVolver').classList.toggle('oculto', v === 'inicio');
   if (!rolCargado && uidActual) cargarRol(uidActual);   // reintenta si el rol no se pudo leer
   if (v === 'inicio' || v === 'etq') cargarCatalogo();

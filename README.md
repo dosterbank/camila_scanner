@@ -12,7 +12,7 @@ Aplicación web estática de inventario y ventas. Usa Supabase para autenticaci�
 
 1. En Supabase, abre **Project Settings > API** y localiza la URL del proyecto y la clave **publishable** (o la clave `anon` heredada).
 2. Revisa `SUPABASE_URL` y `SUPABASE_KEY` al inicio de `js/app-core.js` y configúralas para tu proyecto.
-3. En **SQL Editor**, ejecuta el contenido completo de `supabase-pedidos.sql`. Hazlo en el proyecto correcto y conserva una copia de seguridad antes de aplicar cambios a una base de datos que ya tenga información.
+3. En **SQL Editor**, ejecuta el contenido completo de `supabase-pedidos.sql`. Vuelve a ejecutar el archivo después de actualizarlo para aplicar cambios a las funciones de estadísticas. Hazlo en el proyecto correcto y conserva una copia de seguridad antes de aplicar cambios a una base de datos que ya tenga información.
 4. En **Authentication**, crea las cuentas de los usuarios y configura las URL de redirección para el dominio local y el de GitHub Pages.
 5. Comprueba que las políticas RLS y los roles de usuario estén configurados antes de operar con datos reales.
 
@@ -35,6 +35,8 @@ Abre <http://localhost:8000>. No abras `index.html` directamente como archivo: l
 3. Espera a que termine el despliegue y abre la URL indicada por GitHub Pages.
 4. Añade esa URL, incluyendo la ruta del repositorio si corresponde, a las URL permitidas de Supabase Authentication.
 5. Prueba el inicio de sesión, escaneo, inventario, ventas y cierre de caja con las cuentas y permisos apropiados.
+
+Las estadísticas ofrecen tres periodos: hoy, los últimos siete días (incluido hoy) y cada día del mes actual. Si actualizas `supabase-pedidos.sql`, vuelve a ejecutarlo en Supabase para que el rango de fechas del gráfico coincida con la interfaz.
 
 Las referencias a CSS y JavaScript son relativas para que también funcionen cuando el sitio se publica bajo una ruta de repositorio.
 

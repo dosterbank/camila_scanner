@@ -27,21 +27,23 @@
 </div>
 
 <div id="app" class="oculto">
-  <div class="row" style="justify-content:space-between">
+  <header class="app-header">
     <div class="row">
-      <button onclick="alternarMenu()">☰ Menú</button>
+      <button id="btnMenu" type="button" aria-controls="menu" aria-expanded="false" onclick="alternarMenu()">☰ Menú</button>
       <button id="btnVolver" class="oculto" onclick="vista('inicio')">← Escáner</button>
     </div>
-    <span><span id="quien"></span> <button onclick="salir()">Salir</button></span>
-  </div>
-  <div id="menu" class="card row oculto">
-    <button onclick="vista('inicio')">Escáner</button>
-    <button onclick="vista('etq')">Etiquetas</button>
-    <button id="btnAdmin" onclick="vista('adm')">Inventario</button>
-    <button id="btnCodigos" class="oculto" onclick="vista('cod')">Crear código nuevo</button>
-    <button id="btnVentas" class="oculto" onclick="vista('ventas')">Estadísticas de ventas</button>
-    <button id="btnCaja" onclick="vista('caja')">Cierre de caja</button>
-  </div>
+    <div class="app-user"><span id="quien"></span><button onclick="salir()">Salir</button></div>
+  </header>
+  <button id="menuBackdrop" class="menu-backdrop oculto" type="button" aria-label="Cerrar menú" onclick="alternarMenu(false)"></button>
+  <nav id="menu" class="dashboard-menu oculto" aria-label="Navegación principal">
+    <div class="menu-title"><strong>Inventario Camila</strong><button type="button" class="menu-close" aria-label="Cerrar menú" onclick="alternarMenu(false)">×</button></div>
+    <button class="menu-link" onclick="vista('inicio')">Escáner</button>
+    <button class="menu-link" onclick="vista('etq')">Etiquetas</button>
+    <button id="btnAdmin" class="menu-link" onclick="vista('adm')">Inventario</button>
+    <button id="btnCodigos" class="menu-link oculto" onclick="vista('cod')">Crear código nuevo</button>
+    <button id="btnVentas" class="menu-link oculto" onclick="vista('ventas')">Estadísticas de ventas</button>
+    <button id="btnCaja" class="menu-link" onclick="vista('caja')">Cierre de caja</button>
+  </nav>
 
   <!-- ========== ESCÁNER ========== -->
   <div id="inicio">
@@ -84,7 +86,7 @@
   <div id="adm" class="oculto">
     <div class="card row"><input id="admBuscar" placeholder="Buscar producto" oninput="pintarAdm()" style="flex:1"><button onclick="imprimirInventario()">🖨 Imprimir inventario</button><button id="btnNuevoCod" class="v oculto" onclick="vista('cod')">+ Código nuevo</button>
       <small id="admCount" style="width:100%"></small></div>
-    <div class="card lista"><table><thead id="admHead"></thead><tbody id="admCuerpo"></tbody></table></div>
+    <div class="card lista inventario-lista"><table><thead id="admHead"></thead><tbody id="admCuerpo"></tbody></table></div>
     <div id="admMov" class="card oculto"><b>Movimientos</b>
       <div class="row"><input type="date" id="desde"><input type="date" id="hasta">
         <select id="fTipo"><option value="">Todos</option><option>Entrada</option><option>Descargo</option></select>
@@ -119,16 +121,12 @@
   <div id="ventas" class="oculto">
     <div class="card">
       <h2 style="margin-top:0">Estadísticas de ventas</h2>
-      <div class="row">
-        <label>Periodo
-          <select id="periodoVentas" onchange="cargarEstadisticasVentas()">
-            <option value="dia">Por día · últimos 30 días</option>
-            <option value="semana">Por semana · últimas 12 semanas</option>
-            <option value="mes">Por mes · últimos 12 meses</option>
-          </select>
-        </label>
-        <label>Fecha de referencia <input id="fechaVentas" type="date" onchange="cargarEstadisticasVentas()"></label>
+      <div class="period-control" role="group" aria-label="Periodo de estadísticas">
+        <button type="button" data-periodo="dia" class="period-option activo" aria-pressed="true" onclick="seleccionarPeriodoVentas('dia')">Hoy</button>
+        <button type="button" data-periodo="semana" class="period-option" aria-pressed="false" onclick="seleccionarPeriodoVentas('semana')">7 días</button>
+        <button type="button" data-periodo="mes" class="period-option" aria-pressed="false" onclick="seleccionarPeriodoVentas('mes')">Mes</button>
       </div>
+      <input id="periodoVentas" type="hidden" value="dia">
       <p id="ventasEstado" role="status"></p>
       <p id="ventasResumen" class="caja-total"></p>
       <div id="graficaVentas" class="chart" role="img" aria-label="Ventas agrupadas por periodo"></div>
