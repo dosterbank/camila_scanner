@@ -126,18 +126,22 @@ async function cargarCaja() {
   cerrarDetallePedido();
   const fecha = $('fechaCaja').value || fechaLocalISO();
   $('cajaPedidos').innerHTML = '';
+  $('descargosCaja').innerHTML = '';
   $('cierresCaja').innerHTML = '';
-  estadoDe('cajaEstado', 'Cargando ventas del día…');
+  estadoDe('cajaEstado', 'Cargando ventas y descargos del día…');
   try {
-    const [ventas, cierres, resumen] = await Promise.all([
+    const [ventas, cierres, resumen, descargos] = await Promise.all([
       db.rpc('ventas_caja_dia', { p_fecha: fecha, p_zona: zonaHorariaLocal() }),
       db.rpc('historial_cierres_caja', { p_fecha: fecha }),
-      db.rpc('resumen_caja_dia', { p_fecha: fecha, p_zona: zonaHorariaLocal() })
+      db.rpc('resumen_caja_dia', { p_fecha: fecha, p_zona: zonaHorariaLocal() }),
+      db.rpc('descargos_caja_dia', { p_fecha: fecha, p_zona: zonaHorariaLocal() })
     ]);
     if (ventas.error) throw ventas.error;
     if (cierres.error) throw cierres.error;
     if (resumen.error) throw resumen.error;
+    if (descargos.error) throw descargos.error;
     const filas = ventas.data || [];
+    const filasDescargos = descargos.data || [];
     const datosResumen = (resumen.data || [])[0] || {};
     const total = Number(datosResumen.total || 0);
     const unidades = Number(datosResumen.unidades || 0);
@@ -150,13 +154,21 @@ async function cargarCaja() {
       <td>${Number(p.unidades || 0)}</td><td>${fmt(p.total)}</td>
       <td><button type="button" aria-expanded="false" data-detalle-pedido="${esc(p.numero)}">Ver detalle</button></td>
     </tr>`).join('');
+    $('descargosCaja').innerHTML = filasDescargos.map(m => `<tr>
+      <td>${esc(new Date(m.created_at).toLocaleString('es'))}</td>
+      <td>${esc(m.usuario || '')}</td><td>${esc(m.nombre || '')}</td>
+      <td>${Math.abs(Number(m.cantidad || 0))}</td>
+      <td>${m.numero_comprobante
+        ? `<button type="button" aria-expanded="false" data-detalle-pedido="${esc(m.numero_comprobante)}">Ver comprobante</button>`
+        : '—'}</td>
+    </tr>`).join('') || '<tr><td colspan="5">No hay descargos desde el último cierre.</td></tr>';
     const historial = cierres.data || [];
     $('cierresCaja').innerHTML = historial.map(c => `<tr>
       <td>${esc(new Date(c.cerrado_en).toLocaleString())}</td><td>${esc(c.cerrado_por || '')}</td>
       <td>${Number(c.pedidos || 0)}</td><td>${Number(c.unidades || 0)}</td>
       <td>${fmt(c.total)}</td><td>${esc(c.novedades || 'Sin novedades')}</td>
     </tr>`).join('') || '<tr><td colspan="6">Todavía no hay cierres registrados para esta fecha.</td></tr>';
-    estadoDe('cajaEstado', filas.length ? '' : 'No hay ventas registradas para esta fecha.');
+    estadoDe('cajaEstado', filas.length || filasDescargos.length ? '' : 'No hay ventas ni descargos registrados para esta fecha.');
   } catch (e) {
     estadoDe('cajaEstado', 'No se pudo cargar el cierre de caja: ' + e.message, 's');
     console.error('Error al cargar cierre de caja:', e);
@@ -188,7 +200,8 @@ async function verDetallePedido(boton) {
   boton.textContent = 'Ocultar detalle';
   const filaDetalle = document.createElement('tr');
   filaDetalle.dataset.detalleFila = '';
-  filaDetalle.innerHTML = '<td colspan="6"><div class="pedido-detalle"><p role="status">Cargando detalle…</p></div></td>';
+  const columnas = boton.closest('table').querySelectorAll('thead th').length;
+  filaDetalle.innerHTML = `<td colspan="${columnas}"><div class="pedido-detalle"><p role="status">Cargando detalle…</p></div></td>`;
   boton.closest('tr').after(filaDetalle);
   let resultado;
   try {

@@ -31,17 +31,21 @@ document.addEventListener('keydown', e => {
 });
 
 function encolar(codigo) {
-  const item = { id: `producto-${Date.now()}-${Math.random().toString(36).slice(2)}`, codigo, nombre: 'Registrando…', cantidad: delta, estado: 'pendiente' };
+  const item = { id: `producto-${Date.now()}-${Math.random().toString(36).slice(2)}`, codigo, nombre: 'Registrando…', cantidad: delta, movimientos: [], estado: 'pendiente' };
   pedido.push(item); pintarPedido();
   // cola: un escaneo a la vez, en orden (el servidor además lo hace atómico)
   cola = cola.then(async () => {
     if (bloqueo) {                       // hay un producto sin nombre pendiente: no se registra
       pedido = pedido.filter(i => i !== item); descartados++; pintarPedido(); return;
     }
+    const movimientoFecha = new Date().toISOString();
     const { data, error } = await db.rpc('registrar_movimiento', { p_codigo: codigo, p_cantidad: item.cantidad });
     if (error) { item.estado = 'error'; item.nombre = error.message; }
     else {
       item.nombre = data.nombre;
+      if (item.cantidad < 0) {
+        item.movimientos.push({ fecha: movimientoFecha, nombre: data.nombre, cantidad: Math.abs(item.cantidad) });
+      }
       $('exist').textContent = data.nombre + ': ' + data.total;
       const producto = indice.get(codigo);
       if (producto && data.total != null) producto.cantidad = Number(data.total);

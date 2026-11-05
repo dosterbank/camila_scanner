@@ -97,7 +97,19 @@ create table if not exists public.cierres_caja (
   total numeric(12, 2) not null check (total >= 0),
   novedades text not null default 'Sin novedades'
 );
+create table if not exists public.movimientos_comprobantes (
+  movimiento_fecha timestamptz not null,
+  movimiento_usuario text not null,
+  movimiento_nombre text not null,
+  movimiento_cantidad integer not null check (movimiento_cantidad < 0),
+  numero text not null references public.pedidos(numero) on delete cascade,
+  primary key (movimiento_fecha, movimiento_usuario, movimiento_nombre, movimiento_cantidad)
+);
 alter table public.cierres_caja enable row level security;
+alter table public.movimientos_comprobantes enable row level security;
+revoke all on public.movimientos_comprobantes from public, anon, authenticated;
+create index if not exists movimientos_comprobantes_numero_idx
+  on public.movimientos_comprobantes (numero);
 create index if not exists pedidos_fecha_idx on public.pedidos (fecha desc);
 create index if not exists cierres_caja_fecha_idx on public.cierres_caja (fecha, cerrado_en desc);
 
@@ -317,7 +329,7 @@ begin
   if p_operacion not in (
       'buscar_cliente', 'guardar_pedido', 'estadisticas_ventas', 'productos_mas_vendidos',
       'ventas_caja_dia', 'comprobantes_dia', 'resumen_caja_dia', 'historial_cierres_caja',
-      'detalle_pedido', 'cerrar_caja'
+      'descargos_caja_dia', 'detalle_pedido', 'cerrar_caja'
     )
     or p_maximo < 1 or p_maximo > 100 then
     raise exception 'Operacion no permitida.';
@@ -404,6 +416,7 @@ end;
 $$;
 
 drop function if exists public.guardar_pedido(text, timestamptz, numeric, integer, jsonb, text, text, text, text, text);
+drop function if exists public.guardar_pedido(text, timestamptz, numeric, integer, jsonb, text, text, text, text, text, text);
 create or replace function public.guardar_pedido(
   p_numero text,
   p_fecha timestamptz,
@@ -415,7 +428,8 @@ create or replace function public.guardar_pedido(
   p_documento text,
   p_telefono text,
   p_correo text,
-  p_tipo text
+  p_tipo text,
+  p_descargos jsonb default '[]'::jsonb
 )
 returns uuid
 language plpgsql
@@ -431,6 +445,10 @@ declare
   v_pedido_id uuid;
   v_usuario text;
   v_usuario_pedido text;
+  v_descargo jsonb;
+  v_coincidencias integer;
+  v_movimiento_fecha timestamptz;
+  v_diferencia numeric;
 begin
   if auth.uid() is null then
     raise exception 'Se requiere una sesion iniciada.';
@@ -453,8 +471,23 @@ begin
     or jsonb_typeof(p_lineas) <> 'array'
     or jsonb_array_length(p_lineas) < 1
     or jsonb_array_length(p_lineas) > 300
-    or octet_length(p_lineas::text) > 131072 then
+    or octet_length(p_lineas::text) > 131072
+    or p_descargos is null
+    or jsonb_typeof(p_descargos) <> 'array'
+    or jsonb_array_length(p_descargos) > 5000
+    or octet_length(p_descargos::text) > 131072 then
     raise exception 'Los datos del pedido no son validos o exceden el limite permitido.';
+  end if;
+  if exists (
+    select 1
+    from jsonb_array_elements(p_descargos) as descargo(item)
+    where jsonb_typeof(descargo.item) <> 'object'
+      or length(coalesce(descargo.item ->> 'nombre', '')) not between 1 and 200
+      or coalesce(descargo.item ->> 'cantidad', '') !~ '^[1-9][0-9]{0,5}$'
+      or coalesce(descargo.item ->> 'fecha', '')
+        !~ '^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}:[0-9]{2}[.][0-9]{3}Z$'
+  ) then
+    raise exception 'Los movimientos de descargo no son validos.';
   end if;
   if exists (
     select 1
@@ -647,6 +680,81 @@ begin
     if v_pedido_id is null then
       raise exception 'No tienes permiso para modificar este comprobante.';
     end if;
+  end if;
+
+  delete from public.movimientos_comprobantes
+  where numero = btrim(p_numero);
+  if p_tipo = 'venta' then
+    for v_descargo in select value from jsonb_array_elements(p_descargos)
+    loop
+      select m.created_at, abs(extract(epoch from (
+        m.created_at - (v_descargo ->> 'fecha')::timestamptz
+      )))
+      into v_movimiento_fecha, v_diferencia
+      from public.movimientos m
+      where m.cantidad < 0
+        and m.usuario = v_usuario
+        and lower(btrim(m.nombre)) = lower(btrim(v_descargo ->> 'nombre'))
+        and abs(m.cantidad) = (v_descargo ->> 'cantidad')::integer
+        and m.created_at between
+          (v_descargo ->> 'fecha')::timestamptz - interval '2 minutes'
+          and (v_descargo ->> 'fecha')::timestamptz + interval '2 minutes'
+        and not exists (
+          select 1
+          from public.movimientos_comprobantes mc
+          where mc.movimiento_fecha = m.created_at
+            and mc.movimiento_usuario = m.usuario
+            and mc.movimiento_nombre = m.nombre
+            and mc.movimiento_cantidad = m.cantidad
+        )
+      order by abs(extract(epoch from (
+        m.created_at - (v_descargo ->> 'fecha')::timestamptz
+      ))), m.created_at
+      limit 1;
+      if v_movimiento_fecha is not null then
+        select count(*)::integer into v_coincidencias
+        from public.movimientos m
+        where m.cantidad < 0
+          and m.usuario = v_usuario
+          and lower(btrim(m.nombre)) = lower(btrim(v_descargo ->> 'nombre'))
+          and abs(m.cantidad) = (v_descargo ->> 'cantidad')::integer
+          and m.created_at between
+            (v_descargo ->> 'fecha')::timestamptz - interval '2 minutes'
+            and (v_descargo ->> 'fecha')::timestamptz + interval '2 minutes'
+          and abs(extract(epoch from (
+            m.created_at - (v_descargo ->> 'fecha')::timestamptz
+          ))) = v_diferencia
+          and not exists (
+            select 1
+            from public.movimientos_comprobantes mc
+            where mc.movimiento_fecha = m.created_at
+              and mc.movimiento_usuario = m.usuario
+              and mc.movimiento_nombre = m.nombre
+              and mc.movimiento_cantidad = m.cantidad
+          );
+      end if;
+      if v_movimiento_fecha is not null and v_coincidencias = 1 then
+        insert into public.movimientos_comprobantes (
+          movimiento_fecha, movimiento_usuario, movimiento_nombre, movimiento_cantidad, numero
+        )
+        select m.created_at, m.usuario, m.nombre, m.cantidad, btrim(p_numero)
+        from public.movimientos m
+        where m.created_at = v_movimiento_fecha
+          and m.cantidad < 0
+          and m.usuario = v_usuario
+          and lower(btrim(m.nombre)) = lower(btrim(v_descargo ->> 'nombre'))
+          and abs(m.cantidad) = (v_descargo ->> 'cantidad')::integer
+          and not exists (
+            select 1
+            from public.movimientos_comprobantes mc
+            where mc.movimiento_fecha = m.created_at
+              and mc.movimiento_usuario = m.usuario
+              and mc.movimiento_nombre = m.nombre
+              and mc.movimiento_cantidad = m.cantidad
+          )
+        on conflict do nothing;
+      end if;
+    end loop;
   end if;
   return v_pedido_id;
 end;
@@ -884,6 +992,57 @@ begin
 end;
 $$;
 
+drop function if exists public.descargos_caja_dia(date, text);
+create function public.descargos_caja_dia(p_fecha date, p_zona text)
+returns table (
+  created_at timestamptz, nombre text, cantidad integer, tipo text, usuario text,
+  numero_comprobante text
+)
+language plpgsql
+security definer
+set search_path = pg_catalog, pg_temp
+as $$
+declare
+  v_inicio timestamptz;
+  v_fin timestamptz;
+  v_ultimo_cierre timestamptz;
+begin
+  if auth.uid() is null then
+    raise exception 'Se requiere una sesion iniciada.';
+  end if;
+  if p_fecha is null
+    or p_zona is null
+    or not exists (select 1 from pg_catalog.pg_timezone_names z where z.name = p_zona) then
+    raise exception 'Fecha o zona horaria no validas.';
+  end if;
+  if not public.comprobar_limite_rpc('descargos_caja_dia', 30) then
+    raise exception 'Demasiadas consultas. Espera un minuto e intenta de nuevo.';
+  end if;
+  v_inicio := p_fecha::timestamp at time zone p_zona;
+  v_fin := (p_fecha + 1)::timestamp at time zone p_zona;
+  select max(c.cerrado_en) into v_ultimo_cierre
+  from public.cierres_caja c
+  where c.cerrado_en < v_fin;
+  return query
+  with descargos as (
+    select m.created_at, m.nombre, m.cantidad, m.tipo, m.usuario
+    from public.movimientos m
+    where m.created_at < v_fin
+      and (m.created_at > coalesce(v_ultimo_cierre, v_inicio)
+        or (v_ultimo_cierre is null and m.created_at = v_inicio))
+      and m.cantidad < 0
+  )
+  select m.created_at, m.nombre, m.cantidad, m.tipo, m.usuario, mc.numero
+  from descargos m
+  left join public.movimientos_comprobantes mc
+    on mc.movimiento_fecha = m.created_at
+    and mc.movimiento_usuario = m.usuario
+    and mc.movimiento_nombre = m.nombre
+    and mc.movimiento_cantidad = m.cantidad
+  order by m.created_at;
+end;
+$$;
+
 create or replace function public.historial_cierres_caja(p_fecha date)
 returns table (
   cerrado_en timestamptz, cerrado_por text, pedidos integer, unidades integer, total numeric, novedades text
@@ -1001,6 +1160,7 @@ revoke all on function public.productos_mas_vendidos(text, date, text) from publ
 revoke all on function public.ventas_caja_dia(date, text) from public, anon;
 revoke all on function public.comprobantes_dia(date, text) from public, anon;
 revoke all on function public.resumen_caja_dia(date, text) from public, anon;
+revoke all on function public.descargos_caja_dia(date, text) from public, anon;
 revoke all on function public.historial_cierres_caja(date) from public, anon;
 revoke all on function public.detalle_pedido(text) from public, anon;
 revoke all on function public.cerrar_caja_sin_novedades(date, text) from public, anon;
@@ -1009,13 +1169,14 @@ grant execute on function public.productos_mas_vendidos(text, date, text) to aut
 grant execute on function public.ventas_caja_dia(date, text) to authenticated;
 grant execute on function public.comprobantes_dia(date, text) to authenticated;
 grant execute on function public.resumen_caja_dia(date, text) to authenticated;
+grant execute on function public.descargos_caja_dia(date, text) to authenticated;
 grant execute on function public.historial_cierres_caja(date) to authenticated;
 grant execute on function public.detalle_pedido(text) to authenticated;
 grant execute on function public.cerrar_caja_sin_novedades(date, text) to authenticated;
 
 revoke all on function public.buscar_cliente(text, text, text) from public, anon;
-revoke all on function public.guardar_pedido(text, timestamptz, numeric, integer, jsonb, text, text, text, text, text, text) from public, anon;
+revoke all on function public.guardar_pedido(text, timestamptz, numeric, integer, jsonb, text, text, text, text, text, text, jsonb) from public, anon;
 grant execute on function public.buscar_cliente(text, text, text) to authenticated;
-grant execute on function public.guardar_pedido(text, timestamptz, numeric, integer, jsonb, text, text, text, text, text, text) to authenticated;
+grant execute on function public.guardar_pedido(text, timestamptz, numeric, integer, jsonb, text, text, text, text, text, text, jsonb) to authenticated;
 
 notify pgrst, 'reload schema';

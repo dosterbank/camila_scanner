@@ -174,7 +174,8 @@ async function guardarPedido() {
     p_documento: c.doc || null,
     p_telefono: c.tel || null,
     p_correo: c.correo || null,
-    p_tipo: c.venta ? 'venta' : 'entrada'
+    p_tipo: c.venta ? 'venta' : 'entrada',
+    p_descargos: pedido.flatMap(i => i.movimientos || [])
   };
   datos.p_lineas = c.lineas.map(l => ({
     codigo: l.codigo, nombre: l.nombre, cantidad: l.cant,

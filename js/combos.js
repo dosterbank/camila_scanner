@@ -92,6 +92,7 @@ async function agregarComboPedido() {
     precio: combo.precio,
     componentes: combo.componentes.map(p => ({ codigo: p.codigo, nombre: p.nombre, cantidad: p.cantidad })),
     movimientosRegistrados: [],
+    movimientos: [],
     estado: 'pendiente'
   };
   pedido.push(item);
@@ -101,12 +102,18 @@ async function agregarComboPedido() {
     const aplicados = [];
     try {
       for (const p of item.componentes) {
+        const movimientoFecha = new Date().toISOString();
         const { data, error } = await db.rpc('registrar_movimiento', {
           p_codigo: p.codigo, p_cantidad: p.cantidad * delta
         });
         if (error) throw new Error(`${p.nombre}: ${error.message}`);
         item.movimientosRegistrados.push(p.codigo);
         aplicados.push({ codigo: p.codigo, cantidad: p.cantidad * delta });
+        if (delta < 0) {
+          item.movimientos.push({
+            fecha: movimientoFecha, nombre: data.nombre, cantidad: p.cantidad * Math.abs(delta)
+          });
+        }
         const producto = indice.get(p.codigo);
         if (producto && data && data.total != null) producto.cantidad = Number(data.total);
         $('exist').textContent = `${data.nombre}: ${data.total}`;

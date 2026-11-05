@@ -184,12 +184,15 @@
   <div id="caja" class="oculto">
     <div class="card">
       <div class="row" style="justify-content:space-between">
-        <div><h2 style="margin:0">Cierre de caja</h2><small>Ventas desde el último cierre</small></div>
+        <div><h2 style="margin:0">Cierre de caja</h2><small>Ventas y descargos desde el último cierre</small></div>
         <label>Fecha <input id="fechaCaja" type="date" onchange="cargarCaja()"></label>
       </div>
       <p id="cajaEstado" role="status"></p>
       <p id="cajaResumen" class="caja-total"></p>
       <div class="lista"><table id="tablaCaja"><thead><tr><th>Hora</th><th>Usuario</th><th>Cliente</th><th>Unidades</th><th>Total</th><th>Detalle</th></tr></thead><tbody id="cajaPedidos"></tbody></table></div>
+      <h3>Descargos de productos</h3>
+      <small>Movimientos individuales desde el último cierre; no se incluyen en el total de ventas.</small>
+      <div class="lista"><table id="tablaDescargosCaja"><thead><tr><th>Fecha y hora</th><th>Usuario</th><th>Producto</th><th>Unidades</th><th>Comprobante</th></tr></thead><tbody id="descargosCaja"></tbody></table></div>
       <button id="btnCerrarCaja" class="v" style="margin-top:12px" onclick="cerrarCajaSinNovedades()">Cerrar Caja sin Novedades</button>
     </div>
     <div class="card">
