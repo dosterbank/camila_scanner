@@ -12,11 +12,120 @@ Aplicación web estática de inventario y ventas. Usa Supabase para autenticaci�
 
 1. En Supabase, abre **Project Settings > API** y localiza la URL del proyecto y la clave **publishable** (o la clave `anon` heredada).
 2. Revisa `SUPABASE_URL` y `SUPABASE_KEY` al inicio de `js/app-core.js` y configúralas para tu proyecto.
-3. En **SQL Editor**, ejecuta el contenido completo de `supabase-pedidos.sql`. Vuelve a ejecutar el archivo después de actualizarlo para aplicar cambios al esquema y las funciones de pedidos, clientes, estadísticas y caja. La versión actual guarda ventas y entradas, permite actualizar un comprobante existente y buscar clientes por nombre. Hazlo en el proyecto correcto y conserva una copia de seguridad antes de aplicar cambios a una base de datos que ya tenga información.
+3. En **SQL Editor**, ejecuta `supabase-pedidos.sql` solo para configurar o actualizar las funciones de pedidos, clientes, estadísticas y caja. Este archivo contiene cambios de esas áreas; no lo ejecutes para configurar WhatsApp.
 4. En **Authentication**, crea las cuentas de los usuarios y configura las URL de redirección para el dominio local y el de GitHub Pages.
 5. Comprueba que las políticas RLS y los roles de usuario estén configurados antes de operar con datos reales.
 
 La clave que se usa en el navegador debe ser pública (`publishable`/`anon`). **Nunca** incluyas una clave `service_role` o un secreto privado en estos archivos. La clave pública no sustituye las políticas RLS.
+
+Para que las estadísticas incluyan descargos individuales, ejecuta `supabase-estadisticas.sql` por separado en SQL Editor. Registra el precio seleccionado en cada nuevo descargo sin comprobante y lo suma como venta; los descargos vinculados a un comprobante se excluyen para evitar duplicados. Los descargos anteriores a este cambio no se valoran retroactivamente porque no guardaban el precio seleccionado. Las estadísticas siguen siendo independientes del cierre de caja.
+
+Para comprobar si existen ventas guardadas hoy (cambia la zona horaria por la de la caja):
+
+```sql
+select tipo, count(*) as comprobantes, coalesce(sum(total), 0) as total
+from public.pedidos
+where (fecha at time zone 'America/Guayaquil')::date =
+  (now() at time zone 'America/Guayaquil')::date
+group by tipo;
+```
+
+La consulta solo muestra comprobantes de venta; los descargos individuales se contabilizan aparte en las estadísticas desde que se despliegue la actualización. El cierre de caja no determina cuáles aparecen.
+
+### Bandeja de WhatsApp para el personal
+
+La guía independiente con los pasos para configurar n8n, cambiar la URL POST de derivación y conectar los controles está en [README-WHATSAPP.md](./README-WHATSAPP.md).
+
+Los chats, estados y archivos multimedia se guardarán en la PC local de n8n; Supabase se conserva solo para el inicio de sesión de los empleados. No se crean tablas de chats en Supabase. Para el permiso de los webhooks locales, ejecuta únicamente `supabase-whatsapp.sql` en Supabase. Ese archivo solo crea/actualiza la función de verificación del perfil del personal; no modifica inventario, productos, pedidos ni tablas existentes. La pestaña necesita un servicio HTTPS local para listar conversaciones y mensajes, servir fotos/audios/videos, enviar respuestas y controlar el bot.
+
+#### Acceso local seguro
+
+1. Asigna una IP fija a la PC de n8n y un nombre interno, por ejemp
+lo `n8n.crm.fullpiston.com`.
+2. En el DNS del router o servidor DNS del local, resuelve ese nombre a la IP LAN de n8n. Configura un certificado HTTPS válido en el proxy local (por ejemplo Caddy con certificado ACME DNS-01). No uses HTTP: la plataforma se abre por HTTPS.
+3. Configura el proxy local para permitir CORS únicamente desde `https://crm.fullpiston.com` y el encabezado `Authorization`. Si el navegador solicita permiso para acceder a la red local, permite el acceso para esa plataforma.
+4. En `js/whatsapp.js`, asigna `N8N_LOCAL_API_BASE_URL` a ese origen HTTPS local. Este valor es una dirección, no una clave secreta.
+5. El navegador envía el token de sesión Supabase en `Authorization: Bearer ...`. El webhook de control de n8n debe validarlo llamando `public.usuario_es_personal()` con el mismo token (cabecera `apikey` con la clave pública de Supabase); rechaza la petición si la RPC no devuelve `true`. No uses una clave `service_role` ni un secreto compartido en el JavaScript del navegador.
+
+La resolución local del hostname permite que la interfaz siga abriéndose en `crm.fullpiston.com`, pero el navegador carga adjuntos desde la LAN, no desde Cloudflare. Si falla DNS local o n8n está apagado, la bandeja y los adjuntos no estarán disponibles. Configura copias de seguridad de la base local y del directorio de multimedia.
+
+#### Control de pausa individual y global en n8n
+
+Configura un webhook **POST** `crm-bot-control`, conectado al nodo de código que modifica el mismo `$getWorkflowStaticData('global')` usado por `Normalizar mensaje`. El cuerpo aceptado por la pestaña es:
+
+```json
+{"scope":"global","action":"pause"}
+{"scope":"global","action":"resume"}
+{"scope":"customer","action":"pause","phone":"+593999999999"}
+{"scope":"customer","action":"resume","phone":"+593999999999"}
+{"scope":"global","action":"status"}
+```
+
+El nodo de control debe comprobar primero la sesión del empleado; validar `scope`, `action` y el teléfono; guardar el interruptor global como `data.botGlobalPausado`; y guardar/quitar los clientes en `data.pausados` usando la misma clave numérica normalizada que `Normalizar mensaje`. Devuelve JSON con `ok`, `bot_global_pausado` y `pausados_ahora`. En `Normalizar mensaje` y `Clasificar lote`, comprueba el interruptor global además de la pausa por cliente antes de permitir que responda el bot. Al reactivar globalmente, conserva las pausas individuales que sigan vigentes.
+
+Para validar la sesión sin publicar secretos en el navegador, conecta el webhook a un nodo **HTTP Request** que haga `POST` a `https://<proyecto>.supabase.co/rest/v1/rpc/usuario_es_personal`. Envía `apikey` con la clave pública de Supabase, `Authorization` con `={{ $('Webhook reactivar').first().json.headers.authorization }}` y `Content-Type: application/json`, con cuerpo `{}`. Después verifica que la respuesta sea `true` antes de ejecutar el nodo que cambia el estado; si no, detén el flujo sin modificar nada. Configura la URL y clave pública como variables/credenciales de n8n. El workflow de ejemplo todavía no trae conectado este webhook: hay que añadirlo y activar el flujo antes de usar los controles.
+
+El código del nodo de control puede seguir esta lógica:
+
+```javascript
+const input = $('Webhook reactivar').first().json;
+const body = input.body || {};
+const data = $getWorkflowStaticData('global');
+if (!data.pausados) data.pausados = {};
+
+const scope = String(body.scope || '');
+const action = String(body.action || '');
+const phone = String(body.phone || '').replace(/\D/g, '');
+
+if (action === 'status') {
+  return [{ json: {
+    ok: true,
+    bot_global_pausado: Boolean(data.botGlobalPausado),
+    pausados_ahora: Object.values(data.pausados)
+  } }];
+}
+
+if (!['pause', 'resume'].includes(action) || !['global', 'customer'].includes(scope)) {
+  throw new Error('Acción de control no válida.');
+}
+if (scope === 'customer' && (phone.length < 7 || phone.length > 15)) {
+  throw new Error('El teléfono no es válido.');
+}
+
+if (scope === 'global') {
+  data.botGlobalPausado = action === 'pause';
+} else if (action === 'pause') {
+  data.pausados[phone] = {
+    numero: '+' + phone,
+    nombre: String(body.name || ''),
+    motivo: 'pausa_manual',
+    desde: new Date().toISOString()
+  };
+} else {
+  delete data.pausados[phone];
+}
+
+return [{ json: {
+  ok: true,
+  bot_global_pausado: Boolean(data.botGlobalPausado),
+  pausados_ahora: Object.values(data.pausados)
+} }];
+```
+
+En `Normalizar mensaje`, calcula `pausado` como `Boolean(data.botGlobalPausado || (data.pausados && data.pausados[cliente]))`; la rama pausada debe guardar el mensaje en la bandeja local y no llamar al agente. Revisa de nuevo el estado global e individual en `Clasificar lote` por si el bot se pausó mientras el lote esperaba su ventana de agrupación.
+
+En el workflow compartido, `Webhook reactivar` está sin parámetros ni conexión. Configúralo como POST en `/webhook/crm-bot-control`, conecta primero la validación de sesión y luego el nodo de código de control mostrado arriba; configura la respuesta HTTP para devolver el JSON del último nodo. La pestaña llama a estos endpoints relativos al origen local:
+
+- `POST /webhook/crm-bot-control` para consultar o cambiar pausas. Para la consulta envía `{"scope":"global","action":"status"}`; también devuelve la lista de clientes pausados.
+- `GET /webhook/crm-inbox/conversations?status=...` para listar conversaciones y devolver `bot_global_pausado`.
+- `GET /webhook/crm-inbox/messages?conversation_id=...` para historial y enlaces HTTPS locales de multimedia.
+- `POST /webhook/crm-inbox/reply` para enviar una respuesta. El flujo la envía por YCloud y solo confirma éxito si YCloud la acepta.
+
+El mensaje normalizado de YCloud debe persistirse en la base local junto con los metadatos de conversación; n8n descarga cada adjunto a un directorio dedicado de la PC y el servicio local lo entrega con autorización. No guardes en el historial enlaces temporales de YCloud como sustituto del archivo. Valida la firma del webhook de YCloud, deduplica por ID del mensaje y limita tipos/tamaños permitidos. El estado actual de pausas del flujo compartido usa datos estáticos de n8n; para producción, migra esos interruptores a una tabla persistente local si necesitas consistencia ante reinicios o ejecuciones concurrentes.
+
+La pestaña y los controles quedan preparados en esta app, pero las rutas `/webhook/crm-inbox/*` y la configuración HTTPS/CORS LAN deben añadirse en n8n/proxy antes de poder abrir conversaciones y responder. Los botones global e individual dependen de que el webhook de control quede conectado y activado.
+
+El export n8n compartido contiene una clave de API incrustada: revócala o rótala y reemplázala por una credencial de n8n antes de volver a activar ese flujo. Las llamadas de WhatsApp quedan fuera de esta etapa.
 
 ## Ejecutar localmente
 
@@ -52,7 +161,11 @@ Las referencias a CSS y JavaScript son relativas para que también funcionen cua
 - `js/inventario.js`: administración e inventario.
 - `js/ventas-caja.js`: estadísticas de ventas y cierre de caja.
 - `js/codigos.js`: creación de códigos.
+- `js/whatsapp.js`: bandeja de conversaciones derivadas y respuestas del personal.
+- `README-WHATSAPP.md`: guía independiente de la integración WhatsApp y sus nodos n8n.
 - `js/app-init.js`: inicialización de autenticación al cargar la aplicación.
 - `supabase-pedidos.sql`: tablas, políticas y funciones de Supabase para pedidos, estadísticas y caja.
+- `supabase-estadisticas.sql`: registro del precio de descargos individuales y actualización aislada de estadísticas; no modifica existencias ni comprobantes.
+- `supabase-whatsapp.sql`: función de validación de personal para la integración local de WhatsApp; no modifica inventario ni pedidos.
 
 Los archivos JavaScript se cargan como scripts clásicos y en orden desde `index.html`; conservan funciones globales usadas por los manejadores HTML. Al añadir o mover una función, verifica sus dependencias y mantén ese orden.

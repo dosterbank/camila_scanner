@@ -17,7 +17,7 @@ const sinNombre = n => { const t = (n || '').trim(); return !t || /^sin nombre$/
 const nombreValido = n => n.length >= 2 && /[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/.test(n) && !sinNombre(n);
 
 let delta = 0, pedido = [], catalogo = [], indice = new Map(), cant = {}, precioElegido = {}, cola = Promise.resolve();
-let esAdmin = false, rolCargado = false, prods = [], uidActual = null, usuarioEmail = '';
+let esAdmin = false, esPersonal = false, rolCargado = false, prods = [], uidActual = null, usuarioEmail = '';
 let bloqueo = null, descartados = 0, compActual = null, avisoT = null, timerGuardado = null;
 let colaGuardado = Promise.resolve();
 
@@ -28,7 +28,7 @@ async function iniciar() {
 }
 function reiniciarUI() {
   delta = 0; pedido = []; catalogo = []; indice = new Map(); cant = {}; precioElegido = {}; prods = [];
-  bloqueo = null; descartados = 0; compActual = null; esAdmin = false; cola = Promise.resolve();
+  bloqueo = null; descartados = 0; compActual = null; esAdmin = false; esPersonal = false; cola = Promise.resolve();
   clearTimeout(timerGuardado); timerGuardado = null;
   $('estadoPedido').textContent = ''; $('estadoPedido').className = '';
   document.body.className = '';
@@ -37,9 +37,10 @@ function reiniciarUI() {
   limpiarCliente(); $('exist').textContent = '—'; $('aviso').classList.add('oculto'); $('zonaEscaneo').classList.add('oculto');
   $('modalNombre').classList.add('oculto'); $('modalComp').classList.add('oculto');
   $('btnEntrada').classList.add('oculto'); $('btnCodigos').classList.add('oculto'); $('btnCombos').classList.add('oculto'); $('btnNuevoCod').classList.add('oculto'); $('admMov').classList.add('oculto');
-  $('btnVentas').classList.add('oculto'); $('btnCaja').classList.add('oculto');
+  $('btnVentas').classList.add('oculto'); $('btnCaja').classList.add('oculto'); $('btnWhatsApp').classList.add('oculto');
   $('menu').classList.add('oculto'); $('menuBackdrop').classList.add('oculto');
   $('btnMenu').setAttribute('aria-expanded', 'false'); $('btnVolver').classList.add('oculto'); rolCargado = false;
+  limpiarWhatsApp();
   pintarPedido();
 }
 function mostrar(session) {
@@ -139,7 +140,8 @@ function vista(v) {
   if (v === 'cod' && !esAdmin) v = 'inicio';   // crear códigos: solo admin
   if (v === 'combos' && !esAdmin) v = 'inicio';
   if (v === 'ventas' && !esAdmin) v = 'inicio';
-  ['inicio', 'etq', 'adm', 'cod', 'combos', 'ventas', 'caja', 'comprobantes'].forEach(x => $(x).classList.toggle('oculto', x !== v));
+  if (v === 'whatsapp' && !esPersonal) v = 'inicio';
+  ['inicio', 'etq', 'adm', 'cod', 'combos', 'ventas', 'caja', 'comprobantes', 'whatsapp'].forEach(x => $(x).classList.toggle('oculto', x !== v));
   alternarMenu(false);
   if (v === 'inicio' && delta) document.body.className = delta > 0 ? 'entrada' : 'salida';
   else document.body.className = '';
@@ -152,6 +154,7 @@ function vista(v) {
   if (v === 'ventas') cargarEstadisticasVentas();
   if (v === 'caja') cargarCaja();
   if (v === 'comprobantes') cargarComprobantes();
+  if (v === 'whatsapp') cargarConversacionesWhatsApp();
   if (v === 'inicio') cargarCombosPedido();
   if (v === 'inicio' && !$('codigo').disabled) $('codigo').focus();
 }
@@ -164,6 +167,7 @@ async function cargarRol(uid, intento = 0) {
   }
   rolCargado = !error;
   esAdmin = !!data && String(data.rol || '').trim().toLowerCase() === 'admin';
+  esPersonal = !!data && !!String(data.rol || '').trim();
   // junto al correo se ve el rol detectado, para comprobar que quedó bien
   $('quien').textContent = usuarioEmail + ' · ' + (error ? 'no se pudo leer el rol' : !data ? 'sin perfil' : esAdmin ? 'admin' : String(data.rol));
   // Inventario lo ve todo el mundo (solo lectura); crear códigos y editar es solo admin
@@ -173,9 +177,11 @@ async function cargarRol(uid, intento = 0) {
   $('btnNuevoCod').classList.toggle('oculto', !esAdmin);
   $('btnVentas').classList.toggle('oculto', !esAdmin);
   $('btnCaja').classList.toggle('oculto', !uidActual);
+  $('btnWhatsApp').classList.toggle('oculto', !esPersonal);
   $('admMov').classList.toggle('oculto', !esAdmin);
   if (!$('adm').classList.contains('oculto')) vista('adm');   // si ya estaba en Inventario, redibujar según el rol
   if (!$('ventas').classList.contains('oculto') && !esAdmin) vista('inicio');
+  if (!$('whatsapp').classList.contains('oculto') && !esPersonal) vista('inicio');
 }
 
 // ---------- DATOS ----------

@@ -45,6 +45,7 @@
     <button id="btnVentas" class="menu-link oculto" onclick="vista('ventas')">Estadísticas de ventas</button>
     <button id="btnCaja" class="menu-link" onclick="vista('caja')">Cierre de caja</button>
     <button id="btnComprobantes" class="menu-link" onclick="vista('comprobantes')">Revisar comprobantes</button>
+    <button id="btnWhatsApp" class="menu-link oculto" onclick="vista('whatsapp')">Mensajes de WhatsApp</button>
   </nav>
 
   <!-- ========== ESCÁNER ========== -->
@@ -211,6 +212,63 @@
         <div class="lista"><table id="tablaComprobantes"><thead><tr><th>Hora</th><th>N.º comprobante</th><th>Tipo</th><th>Usuario</th><th>Cliente</th><th>Unidades</th><th>Total</th><th>Detalle</th></tr></thead><tbody id="comprobantesPedidos"></tbody></table></div>
     </div>
   </div>
+  <div id="whatsapp" class="oculto">
+    <div class="card">
+      <div class="row whatsapp-toolbar">
+        <div><h2 style="margin:0">Mensajes de WhatsApp</h2><small>Conversaciones derivadas a una persona</small></div>
+        <button id="btnPausaGlobalWhatsApp" type="button" class="r" onclick="alternarPausaGlobalWhatsApp()" disabled>
+          Cargando estado del bot…
+        </button>
+        <label>Estado
+          <select id="filtroEstadoWhatsApp" onchange="cargarConversacionesWhatsApp()">
+            <option value="abiertas">Pendientes y en atención</option>
+            <option value="pendiente">Pendientes</option>
+            <option value="en_atencion">En atención</option>
+            <option value="resuelto">Resueltas</option>
+            <option value="todas">Todas</option>
+          </select>
+        </label>
+        <button type="button" onclick="cargarConversacionesWhatsApp()">Actualizar</button>
+      </div>
+      <p id="whatsappEstado" role="status"></p>
+      <div class="whatsapp-bot-panel">
+        <div class="row">
+          <label for="telefonoPausaWhatsApp"><b>Pausar a un cliente</b></label>
+          <input id="telefonoPausaWhatsApp" type="tel" inputmode="tel" maxlength="20" placeholder="+593 99 999 9999">
+          <button type="button" onclick="pausarClienteWhatsApp()">Pausar cliente</button>
+        </div>
+        <div>
+          <b>Clientes con el bot pausado</b>
+          <div id="clientesPausadosWhatsApp" class="whatsapp-paused-list"></div>
+        </div>
+      </div>
+      <div class="whatsapp-layout">
+        <aside class="whatsapp-inbox" aria-label="Conversaciones">
+          <div id="listaConversacionesWhatsApp" class="whatsapp-conversations"></div>
+        </aside>
+        <section class="whatsapp-thread" aria-label="Conversación seleccionada">
+          <header id="encabezadoConversacionWhatsApp" class="whatsapp-thread-header">
+            <p>Selecciona una conversación para ver los mensajes.</p>
+          </header>
+          <div id="mensajesWhatsApp" class="whatsapp-messages" aria-live="polite"></div>
+          <div class="whatsapp-bot-control">
+            <span id="estadoBotConversacionWhatsApp">Selecciona una conversación.</span>
+            <button id="btnPausaConversacionWhatsApp" type="button" onclick="alternarPausaConversacionWhatsApp()" disabled>
+              Pausar bot para este cliente
+            </button>
+          </div>
+          <form id="formRespuestaWhatsApp" class="whatsapp-reply" onsubmit="responderWhatsApp(event)">
+            <label for="textoRespuestaWhatsApp" class="oculto">Escribe una respuesta</label>
+            <textarea id="textoRespuestaWhatsApp" maxlength="4000" rows="3" placeholder="Escribe una respuesta…" required disabled></textarea>
+            <div class="row">
+              <small>La respuesta se enviará por n8n y YCloud.</small>
+              <button id="btnEnviarRespuestaWhatsApp" class="v" type="submit" disabled>Enviar respuesta</button>
+            </div>
+          </form>
+        </section>
+      </div>
+    </div>
+  </div>
 </div>
 
 <!-- ========== ALERTA: PRODUCTO SIN NOMBRE (no se puede cerrar) ========== -->
@@ -269,4 +327,5 @@
 <script src="js/inventario.js"></script>
 <script src="js/ventas-caja.js"></script>
 <script src="js/codigos.js"></script>
+<script src="js/whatsapp.js"></script>
 <script src="js/app-init.js"></script></body></html>

@@ -44,7 +44,7 @@ function encolar(codigo) {
     else {
       item.nombre = data.nombre;
       if (item.cantidad < 0) {
-        item.movimientos.push({ fecha: movimientoFecha, nombre: data.nombre, cantidad: Math.abs(item.cantidad) });
+        item.movimientos.push({ fecha: movimientoFecha, nombre: data.nombre, cantidad: Math.abs(item.cantidad), codigo });
       }
       $('exist').textContent = data.nombre + ': ' + data.total;
       const producto = indice.get(codigo);
@@ -53,11 +53,30 @@ function encolar(codigo) {
         item.nombre = 'Sin nombre';
         pedirNombre(data.codigo || codigo, false);   // ya quedó registrado; solo falta el nombre
       } else if (!indice.has(codigo)) await cargarCatalogo();   // producto nuevo: traer su precio
+      if (item.cantidad < 0 && !sinNombre(item.nombre)) {
+        try { await guardarPrecioDescargo(item.movimientos[0]); }
+        catch (e) {
+          avisar('El descargo se registró, pero no se pudo guardar su precio para estadísticas: ' + e.message);
+          console.error('Error al guardar el precio del descargo:', e);
+        }
+      }
       item.estado = 'ok';
     }
     pintarPedido();
     mostrarStockComboPedido();
   });
+}
+async function guardarPrecioDescargo(movimiento) {
+  const codigo = movimiento.codigo;
+  const precioTipo = precioElegido[codigo] || 'precio_en_vivo';
+  const { error } = await db.rpc('registrar_precio_descargo', {
+    p_fecha: movimiento.fecha,
+    p_nombre: movimiento.nombre,
+    p_cantidad: movimiento.cantidad,
+    p_codigo: codigo,
+    p_precio_tipo: precioTipo
+  });
+  if (error) throw error;
 }
 function pedirNombre(codigo, registrarDespues) {
   bloqueo = { codigo, reg: registrarDespues };
@@ -77,11 +96,23 @@ async function guardarNombre() {
   const { error } = await db.rpc('poner_nombre', { p_codigo: codigo, p_nombre: n });
   $('mBtn').disabled = false;
   if (error) { $('mErr').textContent = error.message; return; }
-  pedido.forEach(i => { if (i.codigo === codigo) i.nombre = n; });
+  pedido.forEach(i => {
+    if (i.codigo !== codigo) return;
+    i.nombre = n;
+    i.movimientos.forEach(m => { m.nombre = n; });
+  });
   const p = indice.get(codigo); if (p) p.nombre = n;
   bloqueo = null; $('modalNombre').classList.add('oculto');
   if (reg) encolar(codigo);              // ahora sí se registra el escaneo que estaba detenido
-  cargarCatalogo(); pintarPedido();
+  await cargarCatalogo(); pintarPedido();
+  const movimientos = pedido.flatMap(i => i.codigo === codigo ? i.movimientos : []);
+  if (delta < 0 && movimientos.length) {
+    try { await Promise.all(movimientos.map(guardarPrecioDescargo)); }
+    catch (e) {
+      avisar('No se pudo guardar el precio de uno o más descargos: ' + e.message);
+      console.error('Error al guardar el precio de descargo sin nombre:', e);
+    }
+  }
   if (descartados) { avisar(`${descartados} escaneo(s) que estaban en espera no se registraron. Vuelve a escanearlos.`); descartados = 0; }
   $('codigo').focus();
 }
@@ -136,6 +167,13 @@ $('lista').addEventListener('click', e => {
   precioElegido[codigo] = tipo;
   pintarPedido();
   if (compActual) prepararComprobante();
+  if (delta < 0) {
+    const movimientos = pedido.flatMap(item => item.codigo === codigo ? item.movimientos : []);
+    Promise.all(movimientos.map(guardarPrecioDescargo)).catch(error => {
+      avisar('No se pudo actualizar el precio de uno o más descargos: ' + error.message);
+      console.error('Error al actualizar el precio de descargo:', error);
+    });
+  }
 });
 function pintarPedido() {
   const ls = lineas(), cls = delta < 0 ? 's' : 'e';
