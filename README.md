@@ -36,7 +36,7 @@ La consulta solo muestra comprobantes de venta; los descargos individuales se co
 
 La guía independiente con los pasos para configurar n8n, cambiar la URL POST de derivación y conectar los controles está en [README-WHATSAPP.md](./README-WHATSAPP.md).
 
-La pestaña WhatsApp ahora es una cola de atención: muestra los chats pendientes en orden de llegada, sin mensajes ni archivos multimedia. El botón permite activar o desactivar el bot global; n8n debe reactivarlo diariamente a medianoche sin reactivar los chats pendientes, que solo vuelven a activar su bot al marcarlos como atendidos. Consulta los endpoints y la configuración requerida en [README-WHATSAPP.md](./README-WHATSAPP.md). Supabase se conserva para el inicio de sesión de los empleados; para autorizar los webhooks locales, ejecuta únicamente `supabase-whatsapp.sql`, que no modifica inventario, productos, pedidos ni tablas existentes.
+La pestaña WhatsApp ahora es una cola de atención: muestra los chats pendientes en orden de llegada, sin mensajes ni archivos multimedia. El botón permite activar o desactivar el bot global; cada respuesta humana detectada cierra ese chat, pero mantiene su pausa hasta medianoche. En el reinicio diario solo se reactivan los chats con respuesta registrada; los demás siguen pausados. Consulta la configuración de YCloud y n8n en [README-WHATSAPP.md](./README-WHATSAPP.md). Supabase se conserva para el inicio de sesión de los empleados; para autorizar los webhooks locales, ejecuta únicamente `supabase-whatsapp.sql`, que no modifica inventario, productos, pedidos ni tablas existentes.
 
 #### Acceso local seguro
 

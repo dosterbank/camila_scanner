@@ -18,11 +18,20 @@ La bandeja web ya espera estas rutas en el origen HTTPS local de n8n:
 |---|---|---|
 | POST | `/webhook/crm-bot-control` | Consultar/pausar/reactivar bot global o por cliente |
 | GET | `/webhook/crm-inbox/conversations?status=...` | Listar conversaciones y estado global |
-| POST | `/webhook/crm-inbox/resolve` | Marcar atendido/resuelto y reactivar solo ese cliente |
+| POST | `/webhook/crm-inbox/resolve` | Marcar atendido; reactivar ese cliente a medianoche |
 
 La interfaz está en `js/whatsapp.js`. Configura allí `N8N_LOCAL_API_BASE_URL` con **solo el origen HTTPS local**, por ejemplo `https://n8n.crm.fullpiston.com`. Las rutas de arriba se añaden automáticamente. No pongas una API key en esta variable. La lista se actualiza cada 10 segundos mientras la pestaña esté visible.
 
 La respuesta de `/conversations?status=abiertas` debe incluir `bot_global_pausado` y una lista `conversations`. Cada conversación debe incluir `id`, `nombre`, `telefono`, `estado`, `motivo` y `recibido_en`. `recibido_en` debe ser la hora de llegada inicial a la cola humana y mantenerse inmutable mientras siga pendiente; la web ordena del más antiguo al más nuevo. No envíes contenido del mensaje ni enlaces de multimedia a la bandeja.
+
+La exportación actualizada `n8n-camila v2.json` detecta respuestas salientes de clientes que siguen pausados y guarda `respuesta_agente_en`; cierra el chat en la cola, pero conserva la pausa hasta medianoche. Configura los eventos en el endpoint YCloud que ya apunta al webhook existente:
+
+- Si el personal responde desde WhatsApp Business App, habilita `whatsapp.smb.message.created` y/o `whatsapp.smb.message.echoes`.
+- Si responde mediante un Agent creado con la Public REST API de YCloud, habilita `whatsapp.echo_message.created`.
+
+YCloud solo emite los eventos que correspondan al tipo de integración conectado. Los eventos se correlacionan por el número destinatario; si el payload no trae `to`, no se considera atendido. La detección requiere que el teléfono coincida con un chat pausado.
+
+YCloud recomienda validar `YCloud-Signature` usando el cuerpo HTTP sin modificar. **Esta exportación todavía no valida esa firma**; configura la verificación en el proxy que recibe YCloud antes de producción y no consideres esta ruta autenticada solo por el tipo de evento.
 
 ## Qué hacen los nodos actuales del export
 
@@ -89,15 +98,11 @@ El código antiguo `Reactivar / ver pausados` no es compatible directamente: esp
 
 El botón se titula **«Desactivar bot para todos»** cuando el bot está activo y **«Activar bot para todos»** cuando está pausado. El cambio global solo debe cambiar `data.botGlobalPausado`; no debe vaciar `data.pausados`.
 
-En n8n, añade un nodo **Schedule Trigger** diario a las `00:00` y define explícitamente la zona horaria `America/Guayaquil` (o la zona del local). Conéctalo a un nodo Code que reactive únicamente el control global:
+La exportación actualizada ya incluye un **Schedule Trigger** diario a las `00:00` en la zona horaria del workflow `America/Guayaquil`. El evento de respuesta o la acción **Atendido** cierran el chat en la cola y guardan `respuesta_agente_en`, pero no reactivan al cliente en ese momento. A medianoche el trigger elimina de `data.pausados` únicamente los teléfonos con respuesta registrada y cambia `data.botGlobalPausado` a `false`. Los chats sin respuesta detectada permanecen en la lista y pausados.
 
-```javascript
-const data = $getWorkflowStaticData('global');
-data.botGlobalPausado = false;
-return [{ json: { ok: true, bot_global_pausado: false } }];
-```
+Antes de activar el workflow actualizado, ejecuta una vez el nodo desconectado `Crear tablas (ejecutar una vez)1`. Su SQL agrega `recibido_en` y `respuesta_agente_en` a instalaciones existentes. No borres `data.pausados` en el proceso diario.
 
-No asignes `data.pausados = {}` en ese proceso. El código que decide responder debe mantener la condición `data.botGlobalPausado || data.pausados[cliente]`: así el bot global vuelve a activarse a medianoche, pero los clientes con solicitudes todavía pendientes siguen pausados individualmente.
+Si el cliente vuelve a escribir después de la respuesta del agente y antes de medianoche, el registro de entrada limpia `respuesta_agente_en` y reabre el chat; así no se reactiva al cierre del día sin una nueva respuesta humana.
 
 ### Marcar una solicitud como atendida
 
@@ -107,16 +112,16 @@ La acción **Atendido** envía `POST /webhook/crm-inbox/resolve` con:
 {"conversation_id":"<id>","action":"resolve"}
 ```
 
-El endpoint debe validar el token del empleado igual que el control del bot, comprobar que la conversación existe y sigue abierta, marcarla como `resuelto` y quitar de `data.pausados` únicamente el teléfono normalizado de ese chat. Devuelve `{"ok":true}` solo si completó ambas operaciones. Los otros chats pendientes deben permanecer en la lista y pausados. Al entrar un nuevo mensaje que requiera atención, se debe conservar/crear su pausa individual y fijar `recibido_en` si empieza una nueva solicitud.
+El endpoint autenticado está incluido en la exportación actualizada. Comprueba el token del empleado y que la conversación siga abierta; al marcarla atendida, la quita de la cola y la hace elegible para la reactivación de medianoche, sin quitar todavía su pausa individual. Devuelve `{"ok":true}` solo si encontró y actualizó la conversación. Los otros chats pendientes deben permanecer en la lista y pausados.
 
 ## Requisitos para completar la bandeja
 
 El workflow y/o un servicio local deben implementar:
 
 - Guardar estado y hora inicial de cada conversación pendiente en la base local.
-- Crear el endpoint autenticado `/crm-inbox/resolve` para cerrar una solicitud y reactivar a ese único cliente.
+- Importar y activar el endpoint autenticado `/crm-inbox/resolve` y el Schedule Trigger incluidos en la exportación actualizada.
 - Evitar que reintentos de YCloud creen notificaciones duplicadas para el mismo evento.
 - Configurar IP LAN estable, DNS local y certificado HTTPS válido. Restringe CORS a `https://crm.fullpiston.com` y permite el encabezado `Authorization`.
 - Respaldar el almacenamiento local de conversaciones. Los datos de `$getWorkflowStaticData('global')` pueden no ser suficientes si necesitas consistencia ante reinicios o ejecuciones concurrentes.
 
-La interfaz solo consulta la lista de conversaciones y el control del bot; no llama a mensajes ni envía respuestas. El endpoint de resolución y el Schedule Trigger deben estar implementados y activos en n8n para completar el comportamiento descrito.
+La interfaz solo consulta la lista de conversaciones y el control del bot; no llama a mensajes ni envía respuestas. El webhook de YCloud debe estar suscrito a los eventos de salida correspondientes, y el workflow actualizado debe importarse, ejecutar la migración de columnas y activarse en n8n para completar el comportamiento descrito.
