@@ -363,3 +363,51 @@ async function responderWhatsApp(event) {
     boton.disabled = !conversacionWhatsAppActiva;
   }
 }
+
+const INTERVALO_REFRESCO_WHATSAPP_MS = 10000;
+let refrescandoWhatsApp = false;
+let firmaMensajesWhatsApp = '';
+
+async function refrescarWhatsAppSilencioso() {
+  if (refrescandoWhatsApp || document.hidden || !uidActual || !esPersonal) return;
+  const lista = $('listaConversacionesWhatsApp');
+  if (!lista || !lista.offsetParent) return;
+  refrescandoWhatsApp = true;
+  try {
+    const filtro = $('filtroEstadoWhatsApp').value;
+    const solicitudLista = ++solicitudConversacionesWhatsApp;
+    const result = await solicitarApiWhatsApp(`${N8N_INBOX_PATH}/conversations?status=${encodeURIComponent(filtro)}`);
+    if (solicitudLista !== solicitudConversacionesWhatsApp) return;
+    if (!Array.isArray(result.conversations) || typeof result.bot_global_pausado !== 'boolean') return;
+
+    conversacionesWhatsApp = result.conversations;
+    pausaGlobalWhatsApp = result.bot_global_pausado;
+    pintarControlGlobalWhatsApp();
+    pintarConversacionesWhatsApp();
+
+    const activa = conversacionesWhatsApp.find(c => c.id === conversacionWhatsAppActiva);
+    if (!activa) return;
+    pintarEncabezadoWhatsApp(activa);
+
+    const solicitudMsg = ++solicitudMensajesWhatsApp;
+    const res = await solicitarApiWhatsApp(`${N8N_INBOX_PATH}/messages?conversation_id=${encodeURIComponent(activa.id)}`);
+    if (solicitudMsg !== solicitudMensajesWhatsApp || !Array.isArray(res.messages)) return;
+
+    const ultimo = res.messages[res.messages.length - 1];
+    const firma = activa.id + '|' + res.messages.length + '|' + (ultimo ? ultimo.creado_en : '');
+    if (firma === firmaMensajesWhatsApp) return;
+    firmaMensajesWhatsApp = firma;
+
+    const destino = $('mensajesWhatsApp');
+    const alFinal = destino.scrollHeight - destino.scrollTop - destino.clientHeight < 80;
+    const posicion = destino.scrollTop;
+    pintarMensajesWhatsApp(res.messages);
+    if (!alFinal) destino.scrollTop = posicion;
+  } catch (error) {
+    console.warn('No se pudo actualizar la bandeja de WhatsApp en segundo plano:', error);
+  } finally {
+    refrescandoWhatsApp = false;
+  }
+}
+
+setInterval(refrescarWhatsAppSilencioso, INTERVALO_REFRESCO_WHATSAPP_MS);

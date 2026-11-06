@@ -1,6 +1,14 @@
 # Guía de integración de WhatsApp
 
-Esta guía cubre la bandeja local de WhatsApp, las respuestas humanas, la derivación a la plataforma y los controles para pausar o reactivar el bot. El historial y los adjuntos se guardan en la PC donde se ejecuta n8n; Supabase se usa para autenticar al personal.
+Esta guía cubre la bandeja local de WhatsApp, las respuestas humanas, la derivación a la plataforma y los controles para pausar o reactivar el bot. Supabase se usa para autenticar al personal.
+
+## Estado comprobado de los adjuntos
+
+La inspección de la bandeja en producción encontró un mensaje de tipo `image` cuyo `media_url` apunta a `api.ycloud.com`, y la interfaz no pudo mostrarlo porque solo acepta multimedia servida desde el origen HTTPS local de n8n. La exportación de n8n disponible guarda `media_url`, MIME y nombre de archivo en `buffer_mensajes` por un día; el nodo `Descargar adjunto` obtiene un binario para el procesamiento con Gemini, pero en esa exportación no hay un nodo que escriba el binario a una carpeta persistente.
+
+Por lo tanto, **no está confirmado que los archivos multimedia se estén almacenando localmente**; la evidencia actual indica que se guarda una referencia temporal de YCloud y que la descarga del flujo es transitoria. La exportación inspeccionada puede no reflejar cambios más recientes del workflow, pero la respuesta actual de la API de mensajes todavía devuelve una URL de YCloud. No borres ni limpies datos de YCloud esperando que haya una copia local.
+
+Para confirmar almacenamiento local, cada evento con adjunto debe pasar por una descarga binaria y luego por una escritura persistente en una ruta dedicada de la PC n8n (por ejemplo un volumen montado para Docker). Guarda en la base local la ruta relativa o el identificador del archivo, MIME y tamaño; el endpoint de mensajes debe devolver una URL HTTPS local de n8n, nunca el enlace temporal de YCloud. Comprueba en la PC que el archivo existe después de terminar la ejecución y que se puede volver a servir tras reiniciar n8n.
 
 ## Antes de cambiar el flujo
 

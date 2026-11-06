@@ -36,7 +36,7 @@ La consulta solo muestra comprobantes de venta; los descargos individuales se co
 
 La guía independiente con los pasos para configurar n8n, cambiar la URL POST de derivación y conectar los controles está en [README-WHATSAPP.md](./README-WHATSAPP.md).
 
-Los chats, estados y archivos multimedia se guardarán en la PC local de n8n; Supabase se conserva solo para el inicio de sesión de los empleados. No se crean tablas de chats en Supabase. Para el permiso de los webhooks locales, ejecuta únicamente `supabase-whatsapp.sql` en Supabase. Ese archivo solo crea/actualiza la función de verificación del perfil del personal; no modifica inventario, productos, pedidos ni tablas existentes. La pestaña necesita un servicio HTTPS local para listar conversaciones y mensajes, servir fotos/audios/videos, enviar respuestas y controlar el bot.
+El diseño previsto es guardar los chats, estados y archivos multimedia en la PC local de n8n; Supabase se conserva solo para el inicio de sesión de los empleados. La inspección actual confirmó que la API aún devuelve enlaces de medios de YCloud y no confirmó almacenamiento persistente local de los archivos; consulta el estado y los pasos pendientes en [README-WHATSAPP.md](./README-WHATSAPP.md). No se crean tablas de chats en Supabase. Para el permiso de los webhooks locales, ejecuta únicamente `supabase-whatsapp.sql` en Supabase. Ese archivo solo crea/actualiza la función de verificación del perfil del personal; no modifica inventario, productos, pedidos ni tablas existentes. La pestaña necesita un servicio HTTPS local para listar conversaciones y mensajes, servir fotos/audios/videos, enviar respuestas y controlar el bot.
 
 #### Acceso local seguro
 
