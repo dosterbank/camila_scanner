@@ -1,14 +1,12 @@
 # Guía de integración de WhatsApp
 
-Esta guía cubre la bandeja local de WhatsApp, las respuestas humanas, la derivación a la plataforma y los controles para pausar o reactivar el bot. Supabase se usa para autenticar al personal.
+Esta guía cubre la cola de atención WhatsApp y el control del bot. La bandeja ya no presenta mensajes ni archivos multimedia ni envía respuestas: solo lista chats que requieren atención. Supabase se usa para autenticar al personal.
 
 ## Estado comprobado de los adjuntos
 
-La inspección de la bandeja en producción encontró un mensaje de tipo `image` cuyo `media_url` apunta a `api.ycloud.com`, y la interfaz no pudo mostrarlo porque solo acepta multimedia servida desde el origen HTTPS local de n8n. La exportación de n8n disponible guarda `media_url`, MIME y nombre de archivo en `buffer_mensajes` por un día; el nodo `Descargar adjunto` obtiene un binario para el procesamiento con Gemini, pero en esa exportación no hay un nodo que escriba el binario a una carpeta persistente.
+La interfaz no consume el endpoint de mensajes y no representa adjuntos. La exportación de n8n inspeccionada guardaba `media_url`, MIME y nombre de archivo en `buffer_mensajes` por un día; el nodo `Descargar adjunto` obtenía un binario para procesarlo con Gemini, pero no había un nodo que lo escribiera a una carpeta persistente.
 
-Por lo tanto, **no está confirmado que los archivos multimedia se estén almacenando localmente**; la evidencia actual indica que se guarda una referencia temporal de YCloud y que la descarga del flujo es transitoria. La exportación inspeccionada puede no reflejar cambios más recientes del workflow, pero la respuesta actual de la API de mensajes todavía devuelve una URL de YCloud. No borres ni limpies datos de YCloud esperando que haya una copia local.
-
-Para confirmar almacenamiento local, cada evento con adjunto debe pasar por una descarga binaria y luego por una escritura persistente en una ruta dedicada de la PC n8n (por ejemplo un volumen montado para Docker). Guarda en la base local la ruta relativa o el identificador del archivo, MIME y tamaño; el endpoint de mensajes debe devolver una URL HTTPS local de n8n, nunca el enlace temporal de YCloud. Comprueba en la PC que el archivo existe después de terminar la ejecución y que se puede volver a servir tras reiniciar n8n.
+El uso de archivos multimedia en la bandeja queda fuera del flujo solicitado. La exportación inspeccionada descargaba adjuntos temporalmente para Gemini; no se debe asumir que exista una copia persistente local ni eliminar datos de YCloud esperando que la haya.
 
 ## Antes de cambiar el flujo
 
@@ -20,10 +18,11 @@ La bandeja web ya espera estas rutas en el origen HTTPS local de n8n:
 |---|---|---|
 | POST | `/webhook/crm-bot-control` | Consultar/pausar/reactivar bot global o por cliente |
 | GET | `/webhook/crm-inbox/conversations?status=...` | Listar conversaciones y estado global |
-| GET | `/webhook/crm-inbox/messages?conversation_id=...` | Cargar mensajes y multimedia |
-| POST | `/webhook/crm-inbox/reply` | Enviar una respuesta humana por YCloud |
+| POST | `/webhook/crm-inbox/resolve` | Marcar atendido/resuelto y reactivar solo ese cliente |
 
-La interfaz está en `js/whatsapp.js`. Configura allí `N8N_LOCAL_API_BASE_URL` con **solo el origen HTTPS local**, por ejemplo `https://n8n.crm.fullpiston.com`. Las rutas de arriba se añaden automáticamente. No pongas una API key en esta variable.
+La interfaz está en `js/whatsapp.js`. Configura allí `N8N_LOCAL_API_BASE_URL` con **solo el origen HTTPS local**, por ejemplo `https://n8n.crm.fullpiston.com`. Las rutas de arriba se añaden automáticamente. No pongas una API key en esta variable. La lista se actualiza cada 10 segundos mientras la pestaña esté visible.
+
+La respuesta de `/conversations?status=abiertas` debe incluir `bot_global_pausado` y una lista `conversations`. Cada conversación debe incluir `id`, `nombre`, `telefono`, `estado`, `motivo` y `recibido_en`. `recibido_en` debe ser la hora de llegada inicial a la cola humana y mantenerse inmutable mientras siga pendiente; la web ordena del más antiguo al más nuevo. No envíes contenido del mensaje ni enlaces de multimedia a la bandeja.
 
 ## Qué hacen los nodos actuales del export
 
@@ -86,15 +85,38 @@ Envía `apikey` con la clave pública del proyecto, `Authorization` con el token
 
 El código antiguo `Reactivar / ver pausados` no es compatible directamente: espera query GET, no implementa `status`/pausa global y carece de autenticación. Reemplázalo o adapta su lógica detrás del webhook POST ya autenticado; no habilites ambos caminos públicos sin autorización.
 
+### Reinicio global diario y chats sin atender
+
+El botón se titula **«Desactivar bot para todos»** cuando el bot está activo y **«Activar bot para todos»** cuando está pausado. El cambio global solo debe cambiar `data.botGlobalPausado`; no debe vaciar `data.pausados`.
+
+En n8n, añade un nodo **Schedule Trigger** diario a las `00:00` y define explícitamente la zona horaria `America/Guayaquil` (o la zona del local). Conéctalo a un nodo Code que reactive únicamente el control global:
+
+```javascript
+const data = $getWorkflowStaticData('global');
+data.botGlobalPausado = false;
+return [{ json: { ok: true, bot_global_pausado: false } }];
+```
+
+No asignes `data.pausados = {}` en ese proceso. El código que decide responder debe mantener la condición `data.botGlobalPausado || data.pausados[cliente]`: así el bot global vuelve a activarse a medianoche, pero los clientes con solicitudes todavía pendientes siguen pausados individualmente.
+
+### Marcar una solicitud como atendida
+
+La acción **Atendido** envía `POST /webhook/crm-inbox/resolve` con:
+
+```json
+{"conversation_id":"<id>","action":"resolve"}
+```
+
+El endpoint debe validar el token del empleado igual que el control del bot, comprobar que la conversación existe y sigue abierta, marcarla como `resuelto` y quitar de `data.pausados` únicamente el teléfono normalizado de ese chat. Devuelve `{"ok":true}` solo si completó ambas operaciones. Los otros chats pendientes deben permanecer en la lista y pausados. Al entrar un nuevo mensaje que requiera atención, se debe conservar/crear su pausa individual y fijar `recibido_en` si empieza una nueva solicitud.
+
 ## Requisitos para completar la bandeja
 
-Además del webhook de control, el workflow y/o un servicio local deben implementar las rutas de inbox de la tabla inicial:
+El workflow y/o un servicio local deben implementar:
 
-- Guardar mensajes entrantes y metadatos de conversación localmente, deduplicando por ID del mensaje.
-- Descargar fotos, audios y videos a un directorio dedicado de la PC n8n y servirlos mediante HTTPS local.
-- Enviar respuestas humanas por YCloud desde `/crm-inbox/reply`; confirmar éxito solo si YCloud acepta el envío.
-- Validar las notificaciones entrantes de YCloud y limitar tipos/tamaños de archivos.
+- Guardar estado y hora inicial de cada conversación pendiente en la base local.
+- Crear el endpoint autenticado `/crm-inbox/resolve` para cerrar una solicitud y reactivar a ese único cliente.
+- Evitar que reintentos de YCloud creen notificaciones duplicadas para el mismo evento.
 - Configurar IP LAN estable, DNS local y certificado HTTPS válido. Restringe CORS a `https://crm.fullpiston.com` y permite el encabezado `Authorization`.
-- Respaldar la base local y el directorio de multimedia. Los datos de `$getWorkflowStaticData('global')` pueden no ser suficientes si necesitas consistencia ante reinicios o ejecuciones concurrentes.
+- Respaldar el almacenamiento local de conversaciones. Los datos de `$getWorkflowStaticData('global')` pueden no ser suficientes si necesitas consistencia ante reinicios o ejecuciones concurrentes.
 
-La pestaña web y sus llamadas están preparadas, pero las rutas de inbox y el control no están desplegados solo por ejecutar el workflow exportado.
+La interfaz solo consulta la lista de conversaciones y el control del bot; no llama a mensajes ni envía respuestas. El endpoint de resolución y el Schedule Trigger deben estar implementados y activos en n8n para completar el comportamiento descrito.

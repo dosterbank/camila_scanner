@@ -36,7 +36,7 @@ La consulta solo muestra comprobantes de venta; los descargos individuales se co
 
 La guía independiente con los pasos para configurar n8n, cambiar la URL POST de derivación y conectar los controles está en [README-WHATSAPP.md](./README-WHATSAPP.md).
 
-El diseño previsto es guardar los chats, estados y archivos multimedia en la PC local de n8n; Supabase se conserva solo para el inicio de sesión de los empleados. La inspección actual confirmó que la API aún devuelve enlaces de medios de YCloud y no confirmó almacenamiento persistente local de los archivos; consulta el estado y los pasos pendientes en [README-WHATSAPP.md](./README-WHATSAPP.md). No se crean tablas de chats en Supabase. Para el permiso de los webhooks locales, ejecuta únicamente `supabase-whatsapp.sql` en Supabase. Ese archivo solo crea/actualiza la función de verificación del perfil del personal; no modifica inventario, productos, pedidos ni tablas existentes. La pestaña necesita un servicio HTTPS local para listar conversaciones y mensajes, servir fotos/audios/videos, enviar respuestas y controlar el bot.
+La pestaña WhatsApp ahora es una cola de atención: muestra los chats pendientes en orden de llegada, sin mensajes ni archivos multimedia. El botón permite activar o desactivar el bot global; n8n debe reactivarlo diariamente a medianoche sin reactivar los chats pendientes, que solo vuelven a activar su bot al marcarlos como atendidos. Consulta los endpoints y la configuración requerida en [README-WHATSAPP.md](./README-WHATSAPP.md). Supabase se conserva para el inicio de sesión de los empleados; para autorizar los webhooks locales, ejecuta únicamente `supabase-whatsapp.sql`, que no modifica inventario, productos, pedidos ni tablas existentes.
 
 #### Acceso local seguro
 
@@ -114,16 +114,15 @@ return [{ json: {
 
 En `Normalizar mensaje`, calcula `pausado` como `Boolean(data.botGlobalPausado || (data.pausados && data.pausados[cliente]))`; la rama pausada debe guardar el mensaje en la bandeja local y no llamar al agente. Revisa de nuevo el estado global e individual en `Clasificar lote` por si el bot se pausó mientras el lote esperaba su ventana de agrupación.
 
-En el workflow compartido, `Webhook reactivar` está sin parámetros ni conexión. Configúralo como POST en `/webhook/crm-bot-control`, conecta primero la validación de sesión y luego el nodo de código de control mostrado arriba; configura la respuesta HTTP para devolver el JSON del último nodo. La pestaña llama a estos endpoints relativos al origen local:
+En el workflow compartido, `Webhook reactivar` está sin parámetros ni conexión. Configúralo como POST en `/webhook/crm-bot-control`, conecta primero la validación de sesión y luego el nodo de código de control mostrado arriba; configura la respuesta HTTP para devolver el JSON del último nodo. La cola llama a estos endpoints relativos al origen local:
 
 - `POST /webhook/crm-bot-control` para consultar o cambiar pausas. Para la consulta envía `{"scope":"global","action":"status"}`; también devuelve la lista de clientes pausados.
-- `GET /webhook/crm-inbox/conversations?status=...` para listar conversaciones y devolver `bot_global_pausado`.
-- `GET /webhook/crm-inbox/messages?conversation_id=...` para historial y enlaces HTTPS locales de multimedia.
-- `POST /webhook/crm-inbox/reply` para enviar una respuesta. El flujo la envía por YCloud y solo confirma éxito si YCloud la acepta.
+- `GET /webhook/crm-inbox/conversations?status=abiertas` para listar los chats pendientes en orden por `recibido_en` y devolver `bot_global_pausado`.
+- `POST /webhook/crm-inbox/resolve` con `{"conversation_id":"<id>","action":"resolve"}` para marcar un chat atendido y reactivar solamente a ese cliente.
 
-El mensaje normalizado de YCloud debe persistirse en la base local junto con los metadatos de conversación; n8n descarga cada adjunto a un directorio dedicado de la PC y el servicio local lo entrega con autorización. No guardes en el historial enlaces temporales de YCloud como sustituto del archivo. Valida la firma del webhook de YCloud, deduplica por ID del mensaje y limita tipos/tamaños permitidos. El estado actual de pausas del flujo compartido usa datos estáticos de n8n; para producción, migra esos interruptores a una tabla persistente local si necesitas consistencia ante reinicios o ejecuciones concurrentes.
+La interfaz no solicita mensajes ni muestra multimedia. Los chats deben persistirse localmente con su hora inicial de llegada a la cola; conserva `data.pausados` para los clientes que todavía no se han atendido. Un Schedule Trigger de n8n debe reactivar solo el interruptor global diariamente a medianoche de `America/Guayaquil`, sin limpiar las pausas individuales. Consulta [README-WHATSAPP.md](./README-WHATSAPP.md) para el endpoint autenticado de resolución y los pasos del programador.
 
-La pestaña y los controles quedan preparados en esta app, pero las rutas `/webhook/crm-inbox/*` y la configuración HTTPS/CORS LAN deben añadirse en n8n/proxy antes de poder abrir conversaciones y responder. Los botones global e individual dependen de que el webhook de control quede conectado y activado.
+La configuración HTTPS/CORS de LAN y los endpoints de lista, resolución y control deben estar activos en n8n para completar este flujo.
 
 El export n8n compartido contiene una clave de API incrustada: revócala o rótala y reemplázala por una credencial de n8n antes de volver a activar ese flujo. Las llamadas de WhatsApp quedan fuera de esta etapa.
 
