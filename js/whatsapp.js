@@ -1,5 +1,5 @@
 // Set this to the HTTPS hostname that resolves to the n8n PC on the office LAN.
-const N8N_LOCAL_API_BASE_URL = 'https://crm.fullpiston.com';
+const N8N_LOCAL_API_BASE_URL = 'https://n8n-camila.fullpiston.com';
 const N8N_INBOX_PATH = '/webhook/crm-inbox';
 const N8N_CONTROL_PATH = '/webhook/crm-bot-control';
 
