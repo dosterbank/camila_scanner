@@ -98,7 +98,12 @@ function pintarPastelVentas(grafica) {
   grafica.classList.add('pie-view');
   grafica.setAttribute('aria-label', 'Productos vendidos por unidades');
   const colores = ['#8f178e', '#e25174', '#f39c36', '#2f8a5c', '#3483c5', '#6844a5', '#d2b52b', '#267d80', '#a94b32'];
-  const productos = productosVentas.filter(p => Number(p.unidades) > 0);
+  const productos = productosVentas
+    .filter(p => Number(p.unidades) > 0)
+    .slice()
+    .sort((a, b) => Number(b.unidades) - Number(a.unidades)
+      || String(a.producto || '').localeCompare(String(b.producto || ''), 'es')
+      || String(a.codigo || '').localeCompare(String(b.codigo || ''), 'es'));
   const total = productos.reduce((suma, p) => suma + Number(p.unidades), 0);
   if (!total) {
     grafica.innerHTML = '<p class="pie-empty">No hay productos vendidos en este periodo.</p>';

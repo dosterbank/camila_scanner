@@ -18,7 +18,7 @@ Aplicación web estática de inventario y ventas. Usa Supabase para autenticaci�
 
 La clave que se usa en el navegador debe ser pública (`publishable`/`anon`). **Nunca** incluyas una clave `service_role` o un secreto privado en estos archivos. La clave pública no sustituye las políticas RLS.
 
-Para que las estadísticas incluyan descargos individuales, ejecuta `supabase-estadisticas.sql` por separado en SQL Editor. Registra el precio seleccionado en cada nuevo descargo sin comprobante y lo suma como venta; los descargos vinculados a un comprobante se excluyen para evitar duplicados. Los descargos anteriores a este cambio no se valoran retroactivamente porque no guardaban el precio seleccionado. Las estadísticas siguen siendo independientes del cierre de caja.
+Para que las estadísticas incluyan descargos individuales, ejecuta `supabase-estadisticas.sql` por separado en SQL Editor. Registra el precio seleccionado en cada nuevo descargo sin comprobante y lo suma como venta; los descargos vinculados a un comprobante se excluyen para evitar duplicados. Los descargos anteriores a este cambio no se valoran retroactivamente porque no guardaban el precio seleccionado. Las estadísticas siguen siendo independientes del cierre de caja. La función de productos más vendidos también devuelve todos los productos individualmente, ordenados de mayor a menor; vuelve a ejecutar este archivo (o `supabase-pedidos.sql`) para aplicar esa actualización en Supabase.
 
 Para comprobar si existen ventas guardadas hoy (cambia la zona horaria por la de la caja):
 

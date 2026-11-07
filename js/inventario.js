@@ -33,9 +33,9 @@ tfoot td{border-top:2px solid #000;border-bottom:0;font-weight:bold}`;
   w.document.close(); w.focus(); setTimeout(() => w.print(), 400);
 }
 function pintarAdm() {
-  const todos = admFiltrados(), lista = todos.slice(0, 300);
+  const lista = admFiltrados();
   $('admTabla').classList.toggle('admin', esAdmin);
-  $('admCount').textContent = `Mostrando ${lista.length} de ${todos.length} producto(s)` + (todos.length > 300 ? ' · usa el buscador para acotar; al imprimir salen todos' : '');
+  $('admCount').textContent = `Mostrando ${lista.length} producto(s)`;
   const et = p => `<td><button data-et="${esc(p.codigo)}" title="Imprimir etiqueta">🏷</button></td>`;
   if (!esAdmin) {   // solo lectura
     $('admHead').innerHTML = '<tr><th>Código</th><th>Nombre</th><th>Stock</th><th>Normal</th><th>TikTok</th><th>Mayorista</th><th>Etiq.</th></tr>';

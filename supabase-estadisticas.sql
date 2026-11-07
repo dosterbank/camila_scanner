@@ -274,23 +274,10 @@ begin
     select d.codigo, d.producto, sum(d.unidades)::bigint as unidades
     from productos_detalle d
     group by d.codigo, d.producto
-  ), ordenados as (
-    select p.codigo, p.producto, p.unidades,
-      row_number() over (order by p.unidades desc, p.producto, p.codigo) as posicion
-    from productos p
-  ), segmentos as (
-    select o.codigo, o.producto, o.unidades
-    from ordenados o
-    where o.posicion <= 8
-    union all
-    select null::text, 'Otros'::text, sum(o.unidades)::bigint
-    from ordenados o
-    where o.posicion > 8
-    having count(*) > 0
   )
-  select s.codigo, s.producto, s.unidades
-  from segmentos s
-  order by (s.codigo is null), s.unidades desc, s.producto;
+  select p.codigo, p.producto, p.unidades
+  from productos p
+  order by p.unidades desc, p.producto, p.codigo;
 end;
 $$;
 
