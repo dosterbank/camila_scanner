@@ -17,13 +17,17 @@ function imprimirInventario() {
   if (!lista.length) return alert('No hay productos para imprimir (¿ya cargó el inventario?).');
   const q = $('admBuscar').value.trim();
   const unid = lista.reduce((a, p) => a + (Number(p.cantidad) || 0), 0);
-  const filas = lista.map(p => `<tr><td>${esc(p.codigo)}</td><td>${esc(p.nombre)}</td><td class="d">${p.cantidad}</td><td class="d">${prVer(p.precio_normal)}</td><td class="d">${prVer(p.precio_en_vivo)}</td><td class="d">${prVer(p.precio_mayorista)}</td></tr>`).join('');
+  const filas = lista.map(p => {
+    const codigo = String(p.codigo || '');
+    const codigoImpreso = codigo.length > 60 ? `${codigo.slice(0, 32)}…${codigo.slice(-16)}` : codigo;
+    return `<tr><td>${esc(codigoImpreso)}</td><td>${esc(p.nombre)}</td><td class="d">${p.cantidad}</td><td class="d">${prVer(p.precio_normal)}</td><td class="d">${prVer(p.precio_en_vivo)}</td><td class="d">${prVer(p.precio_mayorista)}</td></tr>`;
+  }).join('');
   const css = `@page{size:A4 portrait;margin:8mm}body{font:8pt/1.1 Arial,sans-serif;color:#000;margin:0}
 h1{font-size:13pt;margin:0}.meta{font-size:8pt;color:#333;margin:1mm 0 2mm}
 table{width:100%;table-layout:fixed;border-collapse:collapse}th,td{border-bottom:1px solid #bbb;padding:.7mm 1mm;text-align:left;font-size:8pt;overflow-wrap:anywhere}
 th:nth-child(1){width:17%}th:nth-child(2){width:39%}th:nth-child(3){width:8%}th:nth-child(4){width:12%}th:nth-child(5){width:11%}th:nth-child(6){width:13%}
 th{border-bottom:1.5px solid #000}thead{display:table-header-group}tr{break-inside:avoid;page-break-inside:avoid}.d{text-align:right}
-tfoot td{border-top:1.5px solid #000;border-bottom:0;font-weight:bold}`;
+tfoot{display:table-row-group}tfoot td{border-top:1.5px solid #000;border-bottom:0;font-weight:bold}`;
   const w = window.open('', '_blank'); if (!w) return alert('Permite las ventanas emergentes.');
   w.document.write(`<!DOCTYPE html><html><head><meta charset="utf-8"><title>Inventario</title><style>${css}</style></head><body>
 <h1>Inventario · Distribuidora Camila</h1>
