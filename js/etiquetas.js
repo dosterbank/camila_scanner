@@ -25,7 +25,7 @@ function cambiarPapelEtiqueta() {
     console.error('Error al guardar el tamaño de etiqueta:', e);
   }
 }
-function visibles() { const q = $('buscar').value.toLowerCase().trim(); return catalogo.filter(p => !q || (p.nombre || '').toLowerCase().includes(q) || p.codigo.includes(q)); }
+function visibles() { const q = $('buscar').value.toLowerCase().trim(); return catalogo.filter(p => !q || (p.nombre || '').toLowerCase().includes(q) || String(p.codigo || '').includes(q)); }
 function pintarCat() {
   $('cuerpo').innerHTML = visibles().slice(0, 300).map(p =>
     `<tr><td>${esc(p.codigo)}</td><td>${esc(p.nombre)}</td><td><input type="number" min="0" data-c="${esc(p.codigo)}" value="${cant[p.codigo] || 0}"></td></tr>`).join('');

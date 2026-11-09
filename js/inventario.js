@@ -64,6 +64,8 @@ $('admCuerpo').addEventListener('click', e => {
   if (id !== undefined) return eliminarProducto(id, boton);
   const c = boton.dataset.et;
   if (c === undefined) return;
+  const producto = prods.find(p => String(p.codigo) === c);
+  if (producto && !catalogo.some(p => String(p.codigo) === c)) catalogo = [...catalogo, producto];
   cant[c] = 1; vista('etq'); $('buscar').value = c; pintarCat();
 });
 async function eliminarProducto(id, boton) {
