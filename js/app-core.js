@@ -20,15 +20,112 @@ let delta = 0, pedido = [], catalogo = [], indice = new Map(), cant = {}, precio
 let esAdmin = false, esPersonal = false, rolCargado = false, prods = [], uidActual = null, usuarioEmail = '';
 let bloqueo = null, descartados = 0, compActual = null, avisoT = null, timerGuardado = null;
 let colaGuardado = Promise.resolve();
+const CLAVES_VIGILANCIA_SESION = {
+  usuario: 'camilaSesionUsuario',
+  fecha: 'camilaSesionFecha',
+  actividad: 'camilaSesionActividad'
+};
+const DURACION_INACTIVIDAD_SESION = 3 * 60 * 60 * 1000;
+const ZONA_HORARIA_SESION = 'America/Guayaquil';
+let timerVigilanciaSesion = null, cerrandoSesionPorTiempo = false, razonCierreAutomatico = '';
 
 // ---------- SESIÓN ----------
 async function iniciar() {
   const { data: { session } } = await db.auth.getSession();
   mostrar(session);
 }
+function fechaSesionEcuador(fecha = new Date()) {
+  const partes = new Intl.DateTimeFormat('en', {
+    timeZone: ZONA_HORARIA_SESION, year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(fecha);
+  const parte = tipo => partes.find(p => p.type === tipo).value;
+  return `${parte('year')}-${parte('month')}-${parte('day')}`;
+}
+function cerrarSesionPorTiempo(motivo) {
+  if (cerrandoSesionPorTiempo) return;
+  cerrandoSesionPorTiempo = true;
+  razonCierreAutomatico = motivo;
+  $('app').classList.add('oculto');
+  $('login').classList.remove('oculto');
+  document.body.classList.add('loginPage');
+  db.auth.signOut({ scope: 'local' }).then(({ error }) => {
+    if (error) throw error;
+  }).catch(error => {
+    console.error('No se pudo cerrar automáticamente la sesión:', error);
+    $('errLogin').textContent = 'No se pudo cerrar automáticamente la sesión. Se volverá a intentar.';
+    cerrandoSesionPorTiempo = false;
+    razonCierreAutomatico = '';
+  });
+}
+function vigilarSesion(session) {
+  const ahora = Date.now();
+  const fechaHoy = fechaSesionEcuador(new Date(ahora));
+  const usuarioGuardado = sessionStorage.getItem(CLAVES_VIGILANCIA_SESION.usuario);
+  const fechaGuardada = sessionStorage.getItem(CLAVES_VIGILANCIA_SESION.fecha);
+  const actividadGuardada = Number(sessionStorage.getItem(CLAVES_VIGILANCIA_SESION.actividad));
+  if (usuarioGuardado === session.user.id && fechaGuardada && Number.isFinite(actividadGuardada)) {
+    if (fechaGuardada !== fechaHoy) {
+      cerrarSesionPorTiempo('La sesión se cerró automáticamente a la medianoche de Ecuador. Inicia sesión de nuevo.');
+      return false;
+    }
+    if (ahora - actividadGuardada >= DURACION_INACTIVIDAD_SESION) {
+      cerrarSesionPorTiempo('La sesión se cerró automáticamente después de 3 horas sin actividad. Inicia sesión de nuevo.');
+      return false;
+    }
+  } else {
+    sessionStorage.setItem(CLAVES_VIGILANCIA_SESION.usuario, session.user.id);
+    sessionStorage.setItem(CLAVES_VIGILANCIA_SESION.fecha, fechaHoy);
+    sessionStorage.setItem(CLAVES_VIGILANCIA_SESION.actividad, String(ahora));
+  }
+  clearInterval(timerVigilanciaSesion);
+  timerVigilanciaSesion = setInterval(() => vigilarSesion(session), 30000);
+  return true;
+}
+function registrarActividadSesion() {
+  if (!uidActual || cerrandoSesionPorTiempo) return;
+  const sessionUser = sessionStorage.getItem(CLAVES_VIGILANCIA_SESION.usuario);
+  if (sessionUser !== uidActual) return;
+  const ahora = Date.now();
+  const fechaGuardada = sessionStorage.getItem(CLAVES_VIGILANCIA_SESION.fecha);
+  const ultimaActividad = Number(sessionStorage.getItem(CLAVES_VIGILANCIA_SESION.actividad));
+  if (fechaGuardada !== fechaSesionEcuador(new Date(ahora))) {
+    cerrarSesionPorTiempo('La sesión se cerró automáticamente a la medianoche de Ecuador. Inicia sesión de nuevo.');
+    return;
+  }
+  if (!Number.isFinite(ultimaActividad) || ahora - ultimaActividad >= DURACION_INACTIVIDAD_SESION) {
+    cerrarSesionPorTiempo('La sesión se cerró automáticamente después de 3 horas sin actividad. Inicia sesión de nuevo.');
+    return;
+  }
+  sessionStorage.setItem(CLAVES_VIGILANCIA_SESION.actividad, String(ahora));
+}
+function limpiarVigilanciaSesion() {
+  clearInterval(timerVigilanciaSesion);
+  timerVigilanciaSesion = null;
+  for (const clave of Object.values(CLAVES_VIGILANCIA_SESION)) sessionStorage.removeItem(clave);
+  cerrandoSesionPorTiempo = false;
+}
+['pointerdown', 'keydown', 'touchstart', 'wheel'].forEach(evento =>
+  document.addEventListener(evento, registrarActividadSesion, { passive: true })
+);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && uidActual && timerVigilanciaSesion) {
+    const ahora = Date.now();
+    const ultimaActividad = Number(sessionStorage.getItem(CLAVES_VIGILANCIA_SESION.actividad));
+    if (fechaSesionEcuador(new Date(ahora)) !== sessionStorage.getItem(CLAVES_VIGILANCIA_SESION.fecha)) {
+      cerrarSesionPorTiempo('La sesión se cerró automáticamente a la medianoche de Ecuador. Inicia sesión de nuevo.');
+    } else if (Number.isFinite(ultimaActividad) && ahora - ultimaActividad >= DURACION_INACTIVIDAD_SESION) {
+      cerrarSesionPorTiempo('La sesión se cerró automáticamente después de 3 horas sin actividad. Inicia sesión de nuevo.');
+    }
+  }
+});
+function limpiarBusquedas() {
+  $('admBuscar').value = '';
+  $('buscar').value = '';
+}
 function reiniciarUI() {
   delta = 0; pedido = []; catalogo = []; indice = new Map(); cant = {}; precioElegido = {}; prods = [];
   bloqueo = null; descartados = 0; compActual = null; esAdmin = false; esPersonal = false; cola = Promise.resolve();
+  limpiarBusquedas();
   clearTimeout(timerGuardado); timerGuardado = null;
   $('estadoPedido').textContent = ''; $('estadoPedido').className = '';
   document.body.className = '';
@@ -45,16 +142,24 @@ function reiniciarUI() {
 }
 function mostrar(session) {
   const pideClave = !!session && modoClave;     // llegó por enlace del correo: primero debe crear su contraseña
+  if (session && !pideClave && !vigilarSesion(session)) return;
   document.body.classList.toggle('loginPage', !session && !pideClave);
   $('login').classList.toggle('oculto', !!session);
   $('clave').classList.toggle('oculto', !pideClave);
   $('app').classList.toggle('oculto', !session || pideClave);
   if (!session) {
+    limpiarVigilanciaSesion();
     if (uidActual) reiniciarUI();
     document.body.className = 'loginPage';
+    if (razonCierreAutomatico) $('errLogin').textContent = razonCierreAutomatico;
+    razonCierreAutomatico = '';
     uidActual = null; cargarCorreos(); return;
   }
-  if (pideClave) { setTimeout(() => $('clave1').focus(), 50); return; }
+  if (pideClave) {
+    limpiarVigilanciaSesion();
+    setTimeout(() => $('clave1').focus(), 50);
+    return;
+  }
   $('quien').textContent = usuarioEmail = session.user.email;
   // Solo se reinicia la pantalla cuando entra OTRO usuario (no en cada refresco de token)
   if (session.user.id !== uidActual) {
@@ -107,7 +212,16 @@ async function entrar() {
 }
 $('pass').addEventListener('keydown', e => { if (e.key === 'Enter') entrar(); });
 cargarCorreos();
-async function salir() { await db.auth.signOut(); iniciar(); }
+async function salir() {
+  $('errLogin').textContent = '';
+  const { error } = await db.auth.signOut({ scope: 'local' });
+  if (error) {
+    console.error('No se pudo cerrar la sesión:', error);
+    alert('No se pudo cerrar la sesión: ' + error.message);
+    return;
+  }
+  iniciar();
+}
 async function olvide() {
   const c = $('email').value.trim();
   $('okLogin').textContent = '';
@@ -141,6 +255,7 @@ function vista(v) {
   if (v === 'combos' && !esAdmin) v = 'inicio';
   if (v === 'ventas' && !esAdmin) v = 'inicio';
   if (v === 'whatsapp' && !esPersonal) v = 'inicio';
+  limpiarBusquedas();
   ['inicio', 'etq', 'adm', 'cod', 'combos', 'ventas', 'caja', 'comprobantes', 'whatsapp'].forEach(x => $(x).classList.toggle('oculto', x !== v));
   alternarMenu(false);
   if (v === 'inicio' && delta) document.body.className = delta > 0 ? 'entrada' : 'salida';
