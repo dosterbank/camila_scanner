@@ -8,6 +8,7 @@ let conversacionesWhatsApp = [];
 let pausaGlobalWhatsApp = false;
 let solicitudConversacionesWhatsApp = 0;
 let refrescandoWhatsApp = false;
+let operacionControlGlobalWhatsApp = false;
 
 function limpiarWhatsApp() {
   conversacionesWhatsApp = [];
@@ -16,6 +17,7 @@ function limpiarWhatsApp() {
   $('listaConversacionesWhatsApp').replaceChildren();
   $('btnPausaGlobalWhatsApp').disabled = true;
   $('btnPausaGlobalWhatsApp').textContent = 'Cargando estado del bot…';
+  $('btnReactivarTodosWhatsApp').disabled = true;
   mostrarEstadoWhatsApp('');
 }
 
@@ -75,10 +77,11 @@ async function solicitarApiWhatsApp(path, opciones = {}) {
 
 function pintarControlGlobalWhatsApp() {
   const boton = $('btnPausaGlobalWhatsApp');
-  boton.disabled = !esPersonal;
+  boton.disabled = !esPersonal || operacionControlGlobalWhatsApp;
   boton.textContent = pausaGlobalWhatsApp ? 'Activar bot para todos' : 'Desactivar bot para todos';
   boton.classList.toggle('r', !pausaGlobalWhatsApp);
   boton.classList.toggle('v', pausaGlobalWhatsApp);
+  $('btnReactivarTodosWhatsApp').disabled = !esPersonal || operacionControlGlobalWhatsApp;
 }
 
 function fechaLlegadaConversacionWhatsApp(conversacion) {
@@ -173,15 +176,15 @@ async function cargarConversacionesWhatsApp(silencioso = false) {
 }
 
 async function alternarPausaGlobalWhatsApp() {
-  if (!esPersonal || !uidActual) return;
+  if (!esPersonal || !uidActual || operacionControlGlobalWhatsApp) return;
   const accion = pausaGlobalWhatsApp ? 'resume' : 'pause';
   const pregunta = pausaGlobalWhatsApp
     ? '¿Activar el bot para todos? Los chats pendientes seguirán pausados hasta marcarlos como atendidos.'
     : '¿Desactivar el bot para todos los clientes?';
   if (!confirm(pregunta)) return;
 
-  const boton = $('btnPausaGlobalWhatsApp');
-  boton.disabled = true;
+  operacionControlGlobalWhatsApp = true;
+  pintarControlGlobalWhatsApp();
   mostrarEstadoWhatsApp('Actualizando el estado del bot…');
   try {
     const result = await solicitarApiWhatsApp(N8N_CONTROL_PATH, {
@@ -193,6 +196,68 @@ async function alternarPausaGlobalWhatsApp() {
   } catch (error) {
     mostrarEstadoWhatsApp('No se pudo cambiar el estado global: ' + error.message, true);
   } finally {
+    operacionControlGlobalWhatsApp = false;
+    pintarControlGlobalWhatsApp();
+  }
+}
+
+async function reactivarTodosWhatsApp() {
+  if (!esPersonal || !uidActual || operacionControlGlobalWhatsApp) return;
+  if (!confirm('¿Reactivar el bot para todos, incluso para los clientes con chats pendientes? Los chats seguirán en la cola de atención.')) return;
+
+  operacionControlGlobalWhatsApp = true;
+  pintarControlGlobalWhatsApp();
+  mostrarEstadoWhatsApp('Reactivando los clientes pausados…');
+  try {
+    const estado = await solicitarApiWhatsApp(N8N_CONTROL_PATH, {
+      method: 'POST',
+      body: JSON.stringify({ scope: 'global', action: 'status' })
+    });
+    if (estado.ok !== true || !Array.isArray(estado.pausados_ahora)) {
+      throw new Error('El estado de pausas devuelto por n8n no tiene el formato esperado.');
+    }
+
+    const telefonos = new Set();
+    for (const cliente of estado.pausados_ahora) {
+      const numero = cliente && (cliente.numero || cliente.phone);
+      const normalizado = String(numero || '').replace(/\D/g, '');
+      if (normalizado.length < 7 || normalizado.length > 15) {
+        throw new Error('La lista de pausas contiene un teléfono no válido; no se modificó el estado.');
+      }
+      telefonos.add(normalizado);
+    }
+
+    const fallidos = [];
+    for (const telefono of telefonos) {
+      try {
+        const result = await solicitarApiWhatsApp(N8N_CONTROL_PATH, {
+          method: 'POST',
+          body: JSON.stringify({ scope: 'customer', action: 'resume', phone: telefono })
+        });
+        if (result.ok !== true) throw new Error('n8n no confirmó la reactivación.');
+      } catch (error) {
+        fallidos.push(error.message || 'Error desconocido');
+      }
+    }
+
+    const global = await solicitarApiWhatsApp(N8N_CONTROL_PATH, {
+      method: 'POST',
+      body: JSON.stringify({ scope: 'global', action: 'resume' })
+    });
+    if (global.ok !== true) throw new Error('n8n no confirmó la reactivación global.');
+    const actualizada = await cargarConversacionesWhatsApp();
+
+    if (fallidos.length) {
+      mostrarEstadoWhatsApp(`El bot global quedó activo, pero no se pudieron reactivar ${fallidos.length} de ${telefonos.size} clientes. Error: ${fallidos[0]}`, true);
+    } else if (!actualizada) {
+      mostrarEstadoWhatsApp(`Bot reactivado para todos (${telefonos.size} cliente(s)), pero no se pudo actualizar la cola.`, true);
+    } else {
+      mostrarEstadoWhatsApp(`Bot reactivado para todos (${telefonos.size} cliente(s)); los chats pendientes siguen en la cola.`);
+    }
+  } catch (error) {
+    mostrarEstadoWhatsApp('No se pudo completar la reactivación global: ' + error.message, true);
+  } finally {
+    operacionControlGlobalWhatsApp = false;
     pintarControlGlobalWhatsApp();
   }
 }
@@ -200,7 +265,7 @@ async function alternarPausaGlobalWhatsApp() {
 async function atenderConversacionWhatsApp(id, boton) {
   const conversacion = conversacionesWhatsApp.find(c => String(c.id) === id);
   if (!conversacion || !esPersonal || !uidActual) return;
-  if (!confirm(`¿Marcar como atendido el chat de ${conversacion.nombre || conversacion.telefono || 'este cliente'} y reactivar su bot?`)) return;
+  if (!confirm(`¿Marcar como atendido el chat de ${conversacion.nombre || conversacion.telefono || 'este cliente'} y dejarlo listo para la reactivación automática de medianoche?`)) return;
 
   boton.disabled = true;
   mostrarEstadoWhatsApp('Marcando el chat como atendido…');

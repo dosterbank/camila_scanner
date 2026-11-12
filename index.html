@@ -224,10 +224,13 @@
         <button id="btnPausaGlobalWhatsApp" type="button" class="r" onclick="alternarPausaGlobalWhatsApp()" disabled>
           Cargando estado del bot…
         </button>
+        <button id="btnReactivarTodosWhatsApp" type="button" class="v" onclick="reactivarTodosWhatsApp()" disabled>
+          Reactivar todos
+        </button>
         <button type="button" onclick="cargarConversacionesWhatsApp()">Actualizar</button>
       </div>
       <p id="whatsappEstado" role="status"></p>
-      <p class="whatsapp-queue-note">Los chats sin atender permanecen pausados aunque el bot global se active automáticamente a medianoche. Pulsa «Atendido» solo después de revisar cada solicitud.</p>
+      <p class="whatsapp-queue-note">«Reactivar todos» también reactiva clientes con chats pendientes; estos seguirán en la cola. Pulsa «Atendido» solo después de revisar cada solicitud.</p>
       <ol id="listaConversacionesWhatsApp" class="whatsapp-conversations" aria-label="Chats que requieren atención" aria-live="polite"></ol>
     </div>
   </div>

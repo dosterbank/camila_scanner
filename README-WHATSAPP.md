@@ -96,9 +96,9 @@ El código antiguo `Reactivar / ver pausados` no es compatible directamente: esp
 
 ### Reinicio global diario y chats sin atender
 
-El botón se titula **«Desactivar bot para todos»** cuando el bot está activo y **«Activar bot para todos»** cuando está pausado. El cambio global solo debe cambiar `data.botGlobalPausado`; no debe vaciar `data.pausados`.
+El botón **«Desactivar bot para todos» / «Activar bot para todos»** solo cambia `data.botGlobalPausado`; al activarlo conserva las pausas individuales. El botón separado **«Reactivar todos»** consulta `pausados_ahora`, envía `{"scope":"customer","action":"resume","phone":"..."}` para cada cliente y luego `{"scope":"global","action":"resume"}`. Así reactiva también a clientes con solicitudes pendientes, sin quitar esas conversaciones de la cola. Si alguna reactivación individual falla, la interfaz informa cuántos clientes quedaron pendientes para poder reintentar.
 
-La exportación actualizada ya incluye un **Schedule Trigger** diario a las `00:00` en la zona horaria del workflow `America/Guayaquil`. El evento de respuesta o la acción **Atendido** cierran el chat en la cola y guardan `respuesta_agente_en`, pero no reactivan al cliente en ese momento. A medianoche el trigger elimina de `data.pausados` únicamente los teléfonos con respuesta registrada y cambia `data.botGlobalPausado` a `false`. Los chats sin respuesta detectada permanecen en la lista y pausados.
+La exportación actualizada ya incluye un **Schedule Trigger** diario a las `00:00` en la zona horaria del workflow `America/Guayaquil`. El evento de respuesta o la acción **Atendido** cierran el chat en la cola y guardan `respuesta_agente_en`, pero no reactivan al cliente en ese momento. A medianoche el trigger elimina de `data.pausados` únicamente los teléfonos con respuesta registrada y cambia `data.botGlobalPausado` a `false`. Los chats sin respuesta detectada permanecen en la lista y pausados, salvo que un empleado use **«Reactivar todos»**; en ese caso se levanta la pausa individual aunque siga pendiente la atención humana.
 
 Antes de activar el workflow actualizado, ejecuta una vez el nodo desconectado `Crear tablas (ejecutar una vez)1`. Su SQL agrega `recibido_en` y `respuesta_agente_en` a instalaciones existentes. No borres `data.pausados` en el proceso diario.
 
