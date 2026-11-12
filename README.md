@@ -13,8 +13,11 @@ Aplicación web estática de inventario y ventas. Usa Supabase para autenticaci�
 1. En Supabase, abre **Project Settings > API** y localiza la URL del proyecto y la clave **publishable** (o la clave `anon` heredada).
 2. Revisa `SUPABASE_URL` y `SUPABASE_KEY` al inicio de `js/app-core.js` y configúralas para tu proyecto.
 3. En **SQL Editor**, ejecuta `supabase-pedidos.sql` solo para configurar o actualizar las funciones de pedidos, clientes, estadísticas y caja. Este archivo contiene cambios de esas áreas; no lo ejecutes para configurar WhatsApp.
-4. En **Authentication**, crea las cuentas de los usuarios y configura las URL de redirección para el dominio local y el de GitHub Pages.
-5. Comprueba que las políticas RLS y los roles de usuario estén configurados antes de operar con datos reales.
+4. En **Authentication > URL Configuration**, configura **Site URL** con la dirección pública de la aplicación y agrega a **Redirect URLs** la URL exacta donde se sirve `index.html` (incluida la ruta del repositorio en GitHub Pages, si corresponde), además de las URL locales que uses. La opción de recuperación solicita volver a esa misma página; si la URL no está permitida, Supabase puede usar Site URL y llevar a una página que no existe.
+5. En la plantilla **Reset Password** de **Authentication > Email Templates**, conserva el enlace de Supabase `{{ .ConfirmationURL }}`; no lo reemplaces por una ruta fija o inexistente.
+6. Comprueba que las políticas RLS y los roles de usuario estén configurados antes de operar con datos reales.
+
+El enlace de recuperación enviado por correo vuelve a la aplicación con una sesión temporal de Supabase. Desde allí se puede definir y confirmar la nueva contraseña; al guardarla, Supabase actualiza las credenciales de la cuenta.
 
 La clave que se usa en el navegador debe ser pública (`publishable`/`anon`). **Nunca** incluyas una clave `service_role` o un secreto privado en estos archivos. La clave pública no sustituye las políticas RLS.
 

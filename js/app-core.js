@@ -4,9 +4,12 @@ const SUPABASE_KEY = 'sb_publishable_W1HNg5ZTFEEi3SegFC5r0A_RzFSOZiO';   // clav
 // ================================================================
 // Enlace del correo (invitación / recuperar contraseña): Supabase lo manda con datos en el # de la dirección
 const hashParams = new URLSearchParams(location.hash.slice(1));
-let modoClave = ['invite', 'recovery', 'signup'].includes(hashParams.get('type'));
-const errorEnlace = hashParams.get('error') ? 'El enlace del correo expiró o ya fue usado. Pulsa «¿Olvidaste tu contraseña?» para recibir uno nuevo.' : '';
-if (errorEnlace) history.replaceState(null, '', location.pathname + location.search);
+const queryParams = new URLSearchParams(location.search);
+let modoClave = ['invite', 'recovery', 'signup'].includes(hashParams.get('type') || queryParams.get('type'));
+const errorEnlace = hashParams.get('error') || queryParams.get('error')
+  ? 'El enlace del correo expiró o ya fue usado. Pulsa «¿Olvidaste tu contraseña?» para recibir uno nuevo.'
+  : '';
+if (errorEnlace) history.replaceState(null, '', location.pathname);
 const db = supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
   auth: { storage: window.sessionStorage, persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
 });
@@ -226,22 +229,65 @@ async function olvide() {
   const c = $('email').value.trim();
   $('okLogin').textContent = '';
   if (!c) { $('errLogin').textContent = 'Escribe tu correo arriba y vuelve a pulsar «¿Olvidaste tu contraseña?».'; return; }
-  const { error } = await db.auth.resetPasswordForEmail(c, { redirectTo: location.origin + location.pathname });
+  const redirect = new URL(location.href);
+  redirect.search = '';
+  redirect.hash = '';
+  const { error } = await db.auth.resetPasswordForEmail(c, { redirectTo: redirect.href });
   if (error) { $('errLogin').textContent = /seconds|rate/i.test(error.message) ? 'Espera un minuto antes de pedir otro enlace.' : error.message; return; }
   $('errLogin').textContent = '';
   $('okLogin').textContent = 'Si el correo está registrado, te enviamos un enlace para crear una contraseña nueva. Revisa también la carpeta de spam.';
 }
+function actualizarFuerzaClave() {
+  const clave = $('clave1').value;
+  const requisitos = [
+    clave.length >= 8,
+    /[A-Za-zÁÉÍÓÚÜÑáéíóúüñ]/.test(clave),
+    /\d/.test(clave),
+    clave.length >= 12 || (/[a-záéíóúüñ]/.test(clave) && /[A-ZÁÉÍÓÚÜÑ]/.test(clave)) || /[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ\d]/.test(clave)
+  ];
+  const fuerza = requisitos.filter(Boolean).length;
+  const barra = $('fuerzaClaveBarra');
+  const etiqueta = $('fuerzaClaveTexto');
+  const segura = fuerza === requisitos.length;
+  const medidor = barra.parentElement;
+  barra.style.width = `${Math.max(10, fuerza * 25)}%`;
+  barra.classList.toggle('segura', segura);
+  etiqueta.classList.toggle('segura', segura);
+  medidor.setAttribute('aria-valuenow', String(fuerza));
+  medidor.setAttribute('aria-valuetext', segura ? 'segura' : 'insegura');
+  etiqueta.textContent = segura ? 'Fuerza: segura' : 'Fuerza: insegura';
+  return fuerza === requisitos.length;
+}
+function alternarVisibilidadClave(boton) {
+  const campo = $(boton.dataset.target);
+  const mostrar = campo.type === 'password';
+  campo.type = mostrar ? 'text' : 'password';
+  boton.textContent = mostrar ? 'Ocultar' : 'Mostrar';
+  boton.setAttribute('aria-label', `${mostrar ? 'Ocultar' : 'Mostrar'} contraseña`);
+  boton.setAttribute('aria-pressed', String(mostrar));
+}
 async function guardarClave() {
   const a = $('clave1').value, b = $('clave2').value, err = t => { $('errClave').textContent = t; };
-  if (a.length < 8) return err('La contraseña debe tener al menos 8 caracteres.');
+  if (!actualizarFuerzaClave()) return err('La contraseña debe tener al menos 8 caracteres e incluir letras y números. Añade mayúsculas, símbolos o más caracteres para que sea segura.');
   if (a !== b) return err('Las contraseñas no coinciden.');
-  const { error } = await db.auth.updateUser({ password: a });
+  const boton = $('guardarClaveBtn');
+  boton.disabled = true;
+  let error;
+  try {
+    ({ error } = await db.auth.updateUser({ password: a }));
+  } finally {
+    boton.disabled = false;
+  }
   if (error) return err(error.message);
   modoClave = false; err(''); $('clave1').value = $('clave2').value = '';
   history.replaceState(null, '', location.pathname + location.search);
   iniciar();
 }
-$('clave2').addEventListener('keydown', e => { if (e.key === 'Enter') guardarClave(); });
+$('clave1').addEventListener('input', () => { actualizarFuerzaClave(); $('errClave').textContent = ''; });
+$('clave2').addEventListener('input', () => { $('errClave').textContent = ''; });
+document.querySelectorAll('.password-toggle').forEach(boton => boton.addEventListener('click', () => alternarVisibilidadClave(boton)));
+['clave1', 'clave2'].forEach(id => $(id).addEventListener('keydown', e => { if (e.key === 'Enter') guardarClave(); }));
+actualizarFuerzaClave();
 
 function alternarMenu(forzar) {
   const abrir = typeof forzar === 'boolean' ? forzar : $('menu').classList.contains('oculto');

@@ -19,11 +19,16 @@
 
 <div id="clave" class="card oculto">
   <h2>Crea tu contraseña</h2>
-  <p>Escribe la contraseña con la que vas a entrar al inventario (mínimo 8 caracteres).</p>
-  <div class="row"><input id="clave1" type="password" placeholder="Nueva contraseña" autocomplete="new-password" style="flex:1">
-  <input id="clave2" type="password" placeholder="Repite la contraseña" autocomplete="new-password" style="flex:1">
-  <button class="v" onclick="guardarClave()">Guardar contraseña</button></div>
-  <p id="errClave" class="s"></p>
+  <p>Usa al menos 8 caracteres e incluye letras y números. Una contraseña más larga y con mayúsculas o símbolos será más segura.</p>
+  <label class="login-field"><span>Nueva contraseña</span><div class="password-input"><input id="clave1" type="password" placeholder="Nueva contraseña" autocomplete="new-password" aria-describedby="ayudaClave fuerzaClaveTexto"><button type="button" class="password-toggle" data-target="clave1" aria-label="Mostrar contraseña" aria-pressed="false">Mostrar</button></div></label>
+  <div class="password-strength" aria-live="polite">
+    <div class="password-strength-track" role="meter" aria-label="Fuerza de la contraseña" aria-valuemin="0" aria-valuemax="4" aria-valuenow="0" aria-valuetext="insegura"><div id="fuerzaClaveBarra" class="password-strength-bar"></div></div>
+    <span id="fuerzaClaveTexto" class="password-strength-label">Fuerza: insegura</span>
+  </div>
+  <small id="ayudaClave" class="password-hint">Incluye letras y números; combina mayúsculas o símbolos para mejorar la seguridad.</small>
+  <label class="login-field"><span>Confirma la contraseña</span><div class="password-input"><input id="clave2" type="password" placeholder="Repite la contraseña" autocomplete="new-password"><button type="button" class="password-toggle" data-target="clave2" aria-label="Mostrar contraseña" aria-pressed="false">Mostrar</button></div></label>
+  <button id="guardarClaveBtn" class="login-submit" type="button" onclick="guardarClave()">Guardar contraseña</button>
+  <p id="errClave" class="s" role="status" aria-live="polite"></p>
 </div>
 
 <div id="app" class="oculto">
