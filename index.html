@@ -11,7 +11,7 @@
   <div class="login-avatar" aria-hidden="true"><svg viewBox="0 0 24 24"><path d="M12 12a4.5 4.5 0 1 0 0-9 4.5 4.5 0 0 0 0 9Zm0 2c-4.1 0-7.5 2.1-7.5 4.7V21h15v-2.3c0-2.6-3.4-4.7-7.5-4.7Z"/></svg></div>
   <h2>Inventario Camila</h2>
   <label class="login-field"><span>Correo</span><div class="combo"><input id="email" type="email" placeholder="tu@correo.com" autocomplete="username"><button type="button" class="flecha" onclick="alternarCorreos()" title="Correos usados antes">▾</button><div id="listaCorreos" class="oculto"></div></div></label>
-  <label class="login-field"><span>Contraseña</span><input id="pass" type="password" placeholder="Contraseña" autocomplete="current-password"></label>
+  <label class="login-field"><span>Contraseña</span><div class="password-input"><input id="pass" type="password" placeholder="Contraseña" autocomplete="current-password"><button type="button" class="password-toggle" data-target="pass" aria-label="Mostrar contraseña" aria-pressed="false">Mostrar</button></div></label>
   <button class="login-submit" onclick="entrar()">Entrar</button>
   <p id="errLogin" class="s"></p><p id="okLogin" class="e"></p>
   <div class="login-links"><span>Acceso seguro</span><a href="#" onclick="olvide();return false">¿Olvidaste tu contraseña?</a></div>

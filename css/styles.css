@@ -76,9 +76,9 @@ body.loginPage{max-width:none;min-height:100vh;padding:24px;display:grid;place-i
 .login-card .s,.login-card .e{text-align:left}
 #clave{width:min(100%,480px);margin:24px auto;padding:28px;border-radius:16px;box-shadow:0 24px 70px rgba(35,0,45,.28)}
 #clave h2{margin-top:0;color:#35123e}
-#clave .password-input{display:flex;align-items:stretch}
-#clave .password-input input{flex:1;min-width:0;border-radius:10px 0 0 10px}
-#clave .password-toggle{min-width:82px;border:1px solid #e1d8e5;border-left:0;border-radius:0 10px 10px 0;background:#f8f2f9;color:#701177}
+.password-input{display:flex;align-items:stretch}
+.password-input input{flex:1;min-width:0;border-radius:10px 0 0 10px}
+.password-toggle{min-width:82px;border:1px solid #e1d8e5;border-left:0;border-radius:0 10px 10px 0;background:#f8f2f9;color:#701177}
 .password-strength{display:flex;align-items:center;gap:10px;margin:-2px 0 4px;color:#9b2226;font-size:13px;font-weight:700}
 .password-strength-track{height:8px;flex:1;overflow:hidden;border-radius:8px;background:#eee}
 .password-strength-bar{width:0;height:100%;background:#c62828;transition:width .2s,background-color .2s}
